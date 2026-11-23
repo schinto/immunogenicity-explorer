@@ -7,9 +7,9 @@
 - Traefik läuft als Container `traefik-traefik-1` im Host-Netz, mit Docker-Provider,
   `exposedbydefault=false`, automatischer Weiterleitung von HTTP auf HTTPS und
   Let's Encrypt über die HTTP-Challenge.
-- `adam.entreater.com` hat **noch keinen DNS-Eintrag**.
+- `adam.entreater.com` ist seit dem 2026-11-23 eingetragen und löst auf (siehe Schritt 1).
 
-## Schritt 1: DNS-Eintrag anlegen
+## Schritt 1: DNS-Eintrag ✅ erledigt (2026-11-23)
 Die Zone `entreater.com` wird bei Hostinger verwaltet (Nameserver `ns1.dns-parking.com`
 und `ns2.dns-parking.com`), zu bearbeiten unter
 `hpanel.hostinger.com/domain/entreater.com/dns`.
@@ -22,18 +22,22 @@ Vorhandenes Muster in der Zone:
 | A | `portfolio` | 187.127.69.57 | 300 |
 | ALIAS | `@` | entreater.com.cdn.hstgr.net | 300 |
 
-Neu anzulegen, nach dem Muster von `portfolio`:
+Angelegt, nach dem Muster von `portfolio`:
 
-| Typ | Name | Inhalt | TTL |
-|---|---|---|---|
-| A | `adam` | 187.127.69.57 | 300 |
+| Typ | Name | Inhalt | TTL | Status |
+|---|---|---|---|---|
+| A | `adam` | 187.127.69.57 | 300 | aktiv seit 2026-11-23 |
 
-Erst danach kann Let's Encrypt ein Zertifikat ausstellen, weil die HTTP-Challenge den
-Namen auflösen muss. Prüfen:
+Geprüft am 2026-11-23: Sowohl der autoritative Nameserver als auch ein öffentlicher
+Resolver liefern `187.127.69.57`.
 
 ```bash
-dig +short adam.entreater.com      # erwartet 187.127.69.57
+dig +short adam.entreater.com                          # 187.127.69.57
+dig +short adam.entreater.com @ns1.dns-parking.com     # autoritativ
 ```
+
+Damit ist die Voraussetzung für das Let's-Encrypt-Zertifikat erfüllt: Die HTTP-Challenge
+kann den Namen auflösen, sobald der Container hinter Traefik läuft.
 
 ## Schritt 2: Abbild bauen und starten
 Auf dem VPS, im Verzeichnis dieses Projekts:
