@@ -1,0 +1,36 @@
+IDC Row identifier,Trial ID,Molecule Assessed for ADA INN Name,Therapeutic Assessed for ADA ID,Disease Indication Category,Therapeutic Route of Administration,Number of Patients analyzed for ADA,Number of ADA+ patients,Frequency of ADA+ patients,ADA detection assay used,Therapeutic Exposure Status,Manually Audited
+CT0046_A1_001,CT0046,Nonacog alfa,PR_0095,Blood Disorders,Intravenous,25.0,1.0,4.0,Anti-FIX Enzyme-linked immunosorbent assay (ELISA) was used for monitoring clinically significant anti-FIX antibody. Anti-FIX ELISA was an assay that detects neutralizing and non-neutralizing antibodies to FIX. All assays were performed at a central laboratory. ITT population included all subjects who received at least 1 dose of study drug,Therapeutic Exposed,False
+CT0176_A1_001,CT0176,Nonacog alfa,PR_0095,Blood Disorders,Intravenous,312.0,1.0,0.320512821,,Therapeutic Exposed,False
+CT0617_A1_001,CT0617,A-dmDT390-bisFV,PR_0011,Cancer and neoplasms,Intravenous,30.0,30.0,100.0,Not reported,Therapeutic Exposed,False
+CT0658_A1_001,CT0658,Alemtuzumab,PR_0020,Cancer and neoplasms,Intravenous,133.0,11.0,8.3,enzyme-linked immunosorbent assay (ELISA),Therapeutic Exposed,True
+CT0175_A1_001,CT0175,Evolocumab,PR_0150,Cardiovascular,Subcutaneous,10.0,0.0,0.0,Electrochemiluminescence (ECL)-based immunoassay,Therapeutic Naive,False
+CT0175_A2_001,CT0175,Evolocumab,PR_0150,Cardiovascular,Subcutaneous,6.0,0.0,0.0,Electrochemiluminescence (ECL)-based immunoassay,Therapeutic Exposed,False
+CT0659_A1_001,CT0659,ATR-107,PR_0050,Healthy Volunteer,Subcutaneous,6.0,3.0,50.0,"electro‐chemiluminescent bridging assay with a three
+tiered approac on MSD instrument with a 5% false positive rate",Therapeutic Exposed,True
+CT0659_A2_001,CT0659,ATR-107,PR_0050,Healthy Volunteer,Subcutaneous,6.0,5.0,83.0,"electro‐chemiluminescent bridging assay with a three
+tiered approac on MSD instrument with a 5% false positive rate",Therapeutic Exposed,True
+CT0053_A1_001,CT0053,Bezlotoxumab,PR_0073,Infectious diseases,Intravenous,44.0,1.0,2.4,Blood samples were collected to determine antibodies to bezlotoxumab,Therapeutic Exposed,False
+CT0053_A2_001,CT0053,Bezlotoxumab,PR_0073,Infectious diseases,Intravenous,62.0,1.0,1.7,Blood samples were collected to determine antibodies to bezlotoxumab,Therapeutic Naive,False
+CT0001_A1_002,CT0001,Efalizumab,PR_0127,Inflammation and autoimmunity,Subcutaneous,480.0,11.0,2.3,,Therapeutic Exposed,False
+CT0001_A1_003,CT0001,Efalizumab,PR_0127,Inflammation and autoimmunity,Subcutaneous,28.0,1.0,7.1,,Therapeutic Exposed,False
+CT0318_A1_001,CT0318,Otelixizumab,PR_0248,Metobolic and endocrine disorders,Intravenous,5.0,2.0,40.0,Samples were analyzed for the presence of anti-Otelixizumab antibodies using a validated immunoelectrochemiluminescent (ECL) assay,Therapeutic Naive,True
+CT0318_A4_001,CT0318,Otelixizumab,PR_0248,Metobolic and endocrine disorders,Intravenous,7.0,1.0,14.28571429,Samples were analyzed for the presence of anti-Otelixizumab antibodies using a validated immunoelectrochemiluminescent (ECL) assay,Therapeutic Naive,True
+CT0007_A1_001,CT0007,Denosumab,PR_0112,Musculoskeletal,Subcutaneous,594.0,0.0,0.0,,Therapeutic Exposed,False
+CT0008_A1_001,CT0008,Denosumab,PR_0112,Musculoskeletal,Subcutaneous,83.0,0.0,0.0,,Therapeutic Exposed,False
+CT0004_A1_001,CT0004,Alemtuzumab,PR_0020,Neurological,Intravenous,20.0,0.0,0.0,Enzyme-linked immunosorbent assay,Therapeutic Exposed,False
+CT0004_A1_002,CT0004,Alemtuzumab,PR_0020,Neurological,Intravenous,20.0,4.0,20.0,Enzyme-linked immunosorbent assay,Therapeutic Exposed,False
+CT0011_A1_001,CT0011,Ofatumumab,PR_0242,Non-inflammatory respiratory diseases,Intravenous,3.0,0.0,0.0,,Therapeutic Exposed,False
+CT0011_A2_001,CT0011,Ofatumumab,PR_0242,Non-inflammatory respiratory diseases,Intravenous,2.0,0.0,0.0,,Therapeutic Naive,False
+CT0237_A1_002,CT0237,Tocilizumab,PR_0345,Non-inflammatory skin diseases,Subcutaneous,43.0,3.0,7.0,,Therapeutic Naive,False
+CT0410_A1_001,CT0410,Tocilizumab,PR_0345,Non-inflammatory skin diseases,Subcutaneous,106.0,6.0,5.9,,Therapeutic Naive,True
+CT0025_A1_002,CT0025,Tanezumab,PR_0335,Renal and urogenital,Subcutaneous,34.0,0.0,0.0,,Therapeutic Exposed,True
+CT0025_A2_002,CT0025,Tanezumab,PR_0335,Renal and urogenital,Subcutaneous,27.0,0.0,0.0,,Therapeutic Exposed,True
+CT0012_A1_001,CT0012,Ranibizumab,PR_0294,Unspecified,Ophthalmic,294.0,5.0,1.7,Antidrug antibody (ADA) assay,Therapeutic Exposed,True
+CT0012_A2_001,CT0012,Aflibercept,PR_0015,Unspecified,Ophthalmic,310.0,9.0,2.9,Antidrug antibody (ADA) assay,Therapeutic Exposed,True
+CT0094_A1_001,CT0094,Moxetumomab pasudotox,PR_0232,Cancer and neoplasms,Intravenous,,,,,Therapeutic Exposed,False
+CT0094_A2_001,CT0094,Moxetumomab pasudotox,PR_0232,Cancer and neoplasms,Intravenous,,,,,Therapeutic Exposed,False
+CT0094_A3_001,CT0094,Moxetumomab pasudotox,PR_0232,Cancer and neoplasms,Intravenous,,,,,Therapeutic Exposed,False
+CT0469_A1_001,CT0469,Adalimumab,PR_0426,Inflammation and autoimmunity,Subcutaneous,33.0,27.0,81.8,A participant was considered to have developed ADAs if a confirmed positive result was observed at any time during the treatment period post-dose (irrespective of titer value). Samples were collected predose (prior to administering investigational product) and before any hematology/chemistry samples were drawn at that visit,Therapeutic Exposed,False
+CT0518_A1_002,CT0518,Adalimumab,PR_0427,Inflammation and autoimmunity,Subcutaneous,143.0,29.0,20.3,Treatment period-week 2,Therapeutic Exposed,True
+CT0518_A2_002,CT0518,Adalimumab,PR_0003,Inflammation and autoimmunity,Subcutaneous,145.0,22.0,15.2,,Therapeutic Exposed,True
+CT0301_A1_001,CT0301,Adalimumab,PR_0003,Inflammation and autoimmunity,Subcutaneous,28.0,3.0,10.71428571,,Therapeutic Naive,False

@@ -1,0 +1,34 @@
+INN Name,Therapeutic ID,Trade name,Manufacturer,Protein Modality,Species,Antibody Backbone,FDA approved
+Adalimumab,PR_0003,HUMIRA,Abbvie,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0004,HYRIMOZ,Sandoz,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0005,CYLTEZO,Boehringer Ingelheim,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0006,ABRILADA,Pfizer,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0007,AMJEVITA,Amgen,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0008,HADLIMA,Samsung Bioepis,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0009,HULIO,"Mylan, Fujifilm Kyowa Kirin Biologics",Monoclonal antibody,Human,human IgG1,Yes
+A-dmDT390-bisFV,PR_0011,RESIMMUNE,Angimmune,Immunotoxin,Bacterial,Not Applicable,Yes
+Aflibercept,PR_0015,EYLEA,Regeneron Pharmaceuticals,Fc-Fusion,Human,human IgG1,Yes
+Alemtuzumab,PR_0020,CAMPATH,"Genzyme, Sanofi",Monoclonal antibody,Humanized,human IgG1,Yes
+Alemtuzumab,PR_0021,MABCAMPATH,"Genzyme, Sanofi",Monoclonal antibody,Humanized,human IgG1,No
+Alemtuzumab,PR_0022,LEMTRADA,Sanofi,Monoclonal antibody,Humanized,human IgG1,Yes
+ATR-107,PR_0050,NONE,Pfizer,Monoclonal antibody,Human,Not Applicable,No
+Bezlotoxumab,PR_0073,ZINPLAVA,Merck & Co,Monoclonal antibody,Human,human IgG1,Yes
+Nonacog alfa,PR_0095,BENEFIX,Pfizer,Blood Clotting Factors,Human,Not Applicable,Yes
+Denosumab,PR_0112,"PROLIA, XGEVA",Amgen,Monoclonal antibody,Human,human IgG2,Yes
+Efalizumab,PR_0127,RAPTIVA,"Genentech, Inc",Monoclonal Antibody,Humanized,human IgG1,Yes
+Ofatumumab,PR_0242,ARZERRA,Novartis,Monoclonal antibody,Humanized,human IgG1,Yes
+Ofatumumab,PR_0243,KESIMPTA,Novartis,Monoclonal antibody,Humanized,human IgG1,Yes
+Otelixizumab,PR_0248,TRX4,"Tolerx, Inc",Monoclonal Antibody,Chimeric,human IgG1,No
+Moxetumomab pasudotox,PR_0232,LUMOXITI,AstraZeneca,Immunotoxin,Bacterial,Not Applicable,Yes
+Tocilizumab,PR_0345,ACTEMRA,Genentech,Monoclonal antibody,Humanized,human IgG1,Yes
+Ranibizumab,PR_0294,LUCENTIS,"Genentech, Inc",Monoclonal antibody,Humanized,Human Fab (CH1 IgG1),Yes
+Adalimumab,PR_0424,AMSPARITY,Pfizer,Monoclonal antibody,Human,human IgG1,Yes
+Adalimumab,PR_0426,M923,Momenta Pharmaceuticals,Monoclonal antibody,Human,human IgG1,No
+Adalimumab,PR_0427,IDACIO,Fresenius Kabi,Monoclonal antibody,Human,human IgG1,Yes
+Tocilizumab,PR_0436,MSB11456,Fresenius Kabi,Monoclonal antibody,Humanized,human IgG1,Yes
+Ranibizumab,PR_0420,BYOOVIZ,Samsung Bioepis,Monoclonal antibody,Humanized,Human Fab (CH1 IgG1),Yes
+Ranibizumab,PR_0421,CIMERLI,Coherus BioSciences,Monoclonal antibody,Humanized,Human Fab (CH1 IgG1),Yes
+Ranibizumab,PR_0422,SUSVIMO,Hoffmann La Roche,Monoclonal antibody,Humanized,Human Fab (CH1 IgG1),Yes
+Evolocumab,PR_0150,REPATHA,Amgen,Monoclonal antibody,Human,human IgG2,Yes
+Tanezumab,PR_0335,"RN624, PF-04383119","Pfizer, Eli Lilly",Monoclonal antibody,Humanized,human IgG2,No
+Denosumab,PR_0431,GP2411,Wyost/Jubbonti,Monoclonal antibody,Human,human IgG2,Yes

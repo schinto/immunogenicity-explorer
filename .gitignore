@@ -1,0 +1,15 @@
+# Rohdaten werden nie committet, siehe DATA.md
+data/idc/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/

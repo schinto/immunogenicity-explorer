@@ -1,0 +1,45 @@
+# Vorlage für das CI-Gate der Software Factory.
+#
+# NOCH NICHT AKTIV. Diese Datei heißt bewusst ".template" und wird von GitHub nicht
+# ausgeführt. Grund: Ein Workflow mit "runs-on: self-hosted" ohne registrierten Runner
+# bleibt für immer in der Warteschlange und erzeugt einen hängenden Check am Pull Request.
+#
+# Aktivierung in Phase 0, erst nachdem der self-hosted Runner auf dem VPS registriert ist:
+#   mv .github/workflows/ci.yml.template .github/workflows/ci.yml
+#
+# Ein self-hosted Runner verbraucht keine GitHub-Actions-Minuten.
+# Er ist nur für private Repositories vorgesehen.
+
+name: check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: [self-hosted, linux, factory]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: uv bereitstellen
+        run: command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Gate ausführen
+        run: ./check.sh
+
+      - name: Test-Manipulation ausschließen
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/test_tamper_check.sh "$BASE_SHA" "$HEAD_SHA"
