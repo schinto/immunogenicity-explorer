@@ -5,8 +5,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "== 1/4 uv sync"
-uv sync --quiet
+echo "== 1/4 uv sync --frozen"
+uv sync --quiet --frozen
 
 echo "== 2/4 ruff format --check"
 uv run ruff format --check .
