@@ -20,6 +20,11 @@ services:
     memswap_limit: 512m
     cpus: 0.5
 
+    # Bei Speichermangel auf dem ganzen Server vor den produktiven Diensten beenden,
+    # aber nach den Factory-Containern (die haben 1000). Die Seite ist zustandslos
+    # und startet über restart: unless-stopped von selbst neu.
+    oom_score_adj: 500
+
     # Die Anwendung ist reines Lesen. Kein Schreibzugriff ins Dateisystem nötig.
     read_only: true
     tmpfs:
