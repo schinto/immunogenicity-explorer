@@ -1,0 +1,70 @@
+# Öffentliche Bereitstellung unter adam.entreater.com auf dem VPS.
+#
+# Muster übernommen von radar.entreater.com auf demselben Server: Traefik erkennt den
+# Container über Labels und holt das Zertifikat per Let's Encrypt (HTTP-Challenge).
+# Traefik läuft dort mit --providers.docker.exposedbydefault=false, deshalb ist
+# traefik.enable=true nötig.
+#
+# Voraussetzungen und Reihenfolge: siehe deploy/README.md
+services:
+  adam:
+    image: immunogenicity-explorer:${IDA_VERSION:-dev}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: adam-explorer
+    restart: unless-stopped
+
+    # Begrenzung, weil der Server knapp bei Arbeitsspeicher ist und keinen Swap hat.
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.5
+
+    # Die Anwendung ist reines Lesen. Kein Schreibzugriff ins Dateisystem nötig.
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    environment:
+      IDA_DATA_DIR: /app/data/idc
+
+    expose:
+      - "8000"
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adam.rule=Host(`adam.entreater.com`)
+      - traefik.http.routers.adam.entrypoints=websecure
+      - traefik.http.routers.adam.tls.certresolver=letsencrypt
+      - traefik.http.services.adam.loadbalancer.server.port=8000
+      # Sicherheitsheader und Komprimierung
+      - traefik.http.routers.adam.middlewares=adam-headers,adam-compress,adam-ratelimit
+      - traefik.http.middlewares.adam-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.adam-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.adam-headers.headers.browserXssFilter=true
+      - traefik.http.middlewares.adam-headers.headers.referrerPolicy=no-referrer
+      - traefik.http.middlewares.adam-compress.compress=true
+      # Schutz gegen einfache Lastspitzen auf einem kleinen Server
+      - traefik.http.middlewares.adam-ratelimit.ratelimit.average=30
+      - traefik.http.middlewares.adam-ratelimit.ratelimit.burst=60
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

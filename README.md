@@ -26,6 +26,15 @@ Geplante Specs:
 Nicht im Scope: eigene ADA-Vorhersagemodelle, Sequenz- oder Strukturberechnungen,
 Nutzerkonten, Schreibzugriff auf die Daten.
 
+## Öffentlicher Betrieb
+Die Anwendung soll unter **https://adam.entreater.com** öffentlich erreichbar sein, nach
+demselben Muster wie `radar.entreater.com` auf demselben Server: ein Container hinter
+Traefik mit Let's-Encrypt-Zertifikat. Anleitung, Voraussetzungen und die Auflagen für den
+öffentlichen Betrieb stehen in [deploy/README.md](deploy/README.md).
+
+Kurz: nur öffentliche Daten, Quellenangabe und Lizenz auf jeder Seite, Hinweis auf die
+eingeschränkte Vergleichbarkeit von ADA-Raten, nur Lesezugriff, begrenzte Ressourcen.
+
 ## Schnellstart
 ```bash
 uv sync

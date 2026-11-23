@@ -108,6 +108,10 @@ Eine **Kohorte mit Messwert** ist eine Zeile mit einem Wert in
 - **AK15** Gegeben jede HTML-Seite. Wenn sie gerendert wird. Dann enthält der Seitenfuß
   die Quellenangabe `Immunogenicity Database Collaborative`, den Lizenzhinweis `CC BY 4.0`
   und die DOI `10.3389/fimmu.2026.1816949`.
+- **AK15b** Gegeben jede HTML-Seite. Wenn sie gerendert wird. Dann enthält sie einen
+  sichtbaren Hinweis, dass ADA-Raten verschiedener Therapeutika ohne klinischen Kontext
+  nicht vergleichbar sind und die Darstellung der Forschung dient. Begründung: Die Seite
+  wird unter `adam.entreater.com` öffentlich betrieben, siehe `deploy/README.md`.
 - **AK16** Gegeben die Tabelle. Wenn eine Kohorte keinen Wert für die ADA-Rate hat. Dann
   zeigt die Zelle einen Strich `–` und nicht `0` oder `nan`.
 

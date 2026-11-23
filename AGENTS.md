@@ -52,6 +52,16 @@ uv run uvicorn ida.app:app --reload   # lokal starten
 - ADA-Raten verschiedener Therapeutika sind nicht direkt vergleichbar. Die Oberfläche darf
   keine Rangliste suggerieren, die den klinischen Kontext weglässt.
 
+## Öffentlicher Betrieb
+Diese Anwendung wird unter `adam.entreater.com` öffentlich erreichbar sein. Daraus folgt
+für jede Änderung:
+- Keine Geheimnisse im Code, in Vorlagen oder in Protokollausgaben.
+- Keine Schreibzugriffe aufs Dateisystem zur Laufzeit. Der Container läuft mit
+  `read_only: true`.
+- Quellenangabe, Lizenz und Kontexthinweis bleiben auf jeder Seite sichtbar.
+- Keine personenbezogenen Daten, auch nicht in Logzeilen.
+Die vollständigen Auflagen stehen in [deploy/README.md](deploy/README.md).
+
 ## Verzeichnisse
 ```
 src/ida/        Anwendungscode (Paket "ida")
