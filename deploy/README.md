@@ -8,21 +8,31 @@
   `exposedbydefault=false`, automatischer Weiterleitung von HTTP auf HTTPS und
   Let's Encrypt über die HTTP-Challenge.
 - `adam.entreater.com` hat **noch keinen DNS-Eintrag**.
-- Der Apex `entreater.com` zeigt auf andere Adressen (92.113.16.170, 92.113.23.82),
-  die DNS-Zone wird also vermutlich beim Webhoster verwaltet, nicht auf dem VPS.
 
-## Schritt 1: DNS (muss der Besitzer der Domain machen)
-Einen A-Eintrag anlegen:
+## Schritt 1: DNS-Eintrag anlegen
+Die Zone `entreater.com` wird bei Hostinger verwaltet (Nameserver `ns1.dns-parking.com`
+und `ns2.dns-parking.com`), zu bearbeiten unter
+`hpanel.hostinger.com/domain/entreater.com/dns`.
 
-```
-adam.entreater.com.   A   187.127.69.57
-```
+Vorhandenes Muster in der Zone:
+
+| Typ | Name | Inhalt | TTL |
+|---|---|---|---|
+| A | `radar` | 187.127.69.57 | 14400 |
+| A | `portfolio` | 187.127.69.57 | 300 |
+| ALIAS | `@` | entreater.com.cdn.hstgr.net | 300 |
+
+Neu anzulegen, nach dem Muster von `portfolio`:
+
+| Typ | Name | Inhalt | TTL |
+|---|---|---|---|
+| A | `adam` | 187.127.69.57 | 300 |
 
 Erst danach kann Let's Encrypt ein Zertifikat ausstellen, weil die HTTP-Challenge den
 Namen auflösen muss. Prüfen:
 
 ```bash
-dig +short adam.entreater.com
+dig +short adam.entreater.com      # erwartet 187.127.69.57
 ```
 
 ## Schritt 2: Abbild bauen und starten
