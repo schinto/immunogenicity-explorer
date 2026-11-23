@@ -1,14 +1,10 @@
-# Vorlage für das CI-Gate der Software Factory.
+# CI-Gate der Software Factory.
 #
-# NOCH NICHT AKTIV. Diese Datei heißt bewusst ".template" und wird von GitHub nicht
-# ausgeführt. Grund: Ein Workflow mit "runs-on: self-hosted" ohne registrierten Runner
-# bleibt für immer in der Warteschlange und erzeugt einen hängenden Check am Pull Request.
+# Läuft auf dem self-hosted Runner auf dem VPS (Container factory-github-runner).
+# Verbraucht keine GitHub-Actions-Minuten. Nur für private Repositories.
 #
-# Aktivierung in Phase 0, erst nachdem der self-hosted Runner auf dem VPS registriert ist:
-#   mv .github/workflows/ci.yml.template .github/workflows/ci.yml
-#
-# Ein self-hosted Runner verbraucht keine GitHub-Actions-Minuten.
-# Er ist nur für private Repositories vorgesehen.
+# Der Check "check" ist der Vertrag: Hermes darf eine Karte erst abschließen,
+# wenn er auf dem aktuellen Commit grün ist (--completion-contract).
 
 name: check
 
