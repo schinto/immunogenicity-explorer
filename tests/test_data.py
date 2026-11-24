@@ -47,12 +47,48 @@ def test_ac1_returns_only_cohorts_with_measured_ada_count(cohorts_csv: Path) -> 
     assert all(cohort.n_analyzed is not None for cohort in cohorts)
 
 
-def test_ac1_csv_parser_handles_line_breaks_inside_fields(cohorts_csv: Path) -> None:
-    """AC1: the fixture holds 33 records although fields contain line breaks."""
-    with cohorts_csv.open(newline="", encoding="utf-8") as handle:
-        records = list(csv.DictReader(handle))
+def test_ac1_loader_keeps_line_breaks_inside_mapped_fields(tmp_path: Path) -> None:
+    """AC1: a quoted line break in a mapped field does not split the record.
 
-    assert len(records) == 33
+    The loader itself must handle the line break; the value is kept verbatim and
+    the following record is still loaded at its own boundary.
+    """
+    multiline_name = "adalimumab\n(recombinant)"
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                multiline_name,
+                "Blood Disorders",
+                "Subcutaneous",
+                "10.0",
+                "1.0",
+                "10.0",
+            ],
+            [
+                "CT0002_A1_001",
+                "CT0002",
+                "infliximab",
+                "Blood Disorders",
+                "Intravenous",
+                "20.0",
+                "2.0",
+                "10.0",
+            ],
+        ],
+    )
+
+    cohorts = load_cohorts(path)
+
+    assert len(cohorts) == 2
+    assert cohorts[0].inn_name == multiline_name
+    assert cohorts[0].n_analyzed == 10
+    assert cohorts[1].row_id == "CT0002_A1_001"
+    assert cohorts[1].inn_name == "infliximab"
+    assert cohorts[1].n_analyzed == 20
 
 
 def test_ac2_cohort_has_the_expected_fields(cohorts_csv: Path) -> None:
@@ -111,6 +147,8 @@ def test_ac3_empty_ada_positive_count_stays_missing(tmp_path: Path) -> None:
 
     assert cohort.n_ada_positive is None
     assert cohort.n_analyzed == 10
+    # A blank ADA rate is missing too, never filled with 0.0.
+    assert cohort.ada_frequency_percent is None
 
 
 @pytest.mark.parametrize("missing_column", REQUIRED_COLUMNS)
