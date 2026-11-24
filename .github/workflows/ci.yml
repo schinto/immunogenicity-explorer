@@ -1,10 +1,10 @@
-# CI-Gate der Software Factory.
+# CI gate of the Software Factory.
 #
-# Läuft auf dem self-hosted Runner auf dem VPS (Container factory-github-runner).
-# Verbraucht keine GitHub-Actions-Minuten. Nur für private Repositories.
+# Runs on the self-hosted runner on the VPS (container factory-github-runner).
+# Consumes no GitHub Actions minutes. Only for private repositories.
 #
-# Der Check "check" ist der Vertrag: Hermes darf eine Karte erst abschließen,
-# wenn er auf dem aktuellen Commit grün ist (--completion-contract).
+# The "check" check is the contract: Hermes may complete a card only
+# when it is green on the current commit (--completion-contract).
 
 name: check
 
@@ -27,13 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: uv bereitstellen
+      - name: Provide uv
         run: command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Gate ausführen
+      - name: Run gate
         run: ./check.sh
 
-      - name: Test-Manipulation ausschließen
+      - name: Rule out test tampering
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

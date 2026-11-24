@@ -1,46 +1,46 @@
-# Öffentliche Bereitstellung unter adam.entreater.com
+# Public deployment at adam.entreater.com
 
-## Ausgangslage auf dem VPS (geprüft am 2026-11-23)
-- Öffentliche IP des Servers: **187.127.69.57**
-- `radar.entreater.com` zeigt auf **genau diese IP** und wird über Traefik ausgeliefert
-  (Container `causal-radar-platform-wikijs-1` und `causal-radar-platform-diagrams-1`).
-- Traefik läuft als Container `traefik-traefik-1` im Host-Netz, mit Docker-Provider,
-  `exposedbydefault=false`, automatischer Weiterleitung von HTTP auf HTTPS und
-  Let's Encrypt über die HTTP-Challenge.
-- `adam.entreater.com` ist seit dem 2026-11-23 eingetragen und löst auf (siehe Schritt 1).
+## Starting point on the VPS (checked on 2026-11-23)
+- Public IP of the server: **187.127.69.57**
+- `radar.entreater.com` points to **exactly this IP** and is served via Traefik
+  (containers `causal-radar-platform-wikijs-1` and `causal-radar-platform-diagrams-1`).
+- Traefik runs as container `traefik-traefik-1` in the host network, with the Docker provider,
+  `exposedbydefault=false`, automatic redirection from HTTP to HTTPS and
+  Let's Encrypt via the HTTP challenge.
+- `adam.entreater.com` has been registered since 2026-11-23 and resolves (see step 1).
 
-## Schritt 1: DNS-Eintrag ✅ erledigt (2026-11-23)
-Die Zone `entreater.com` wird bei Hostinger verwaltet (Nameserver `ns1.dns-parking.com`
-und `ns2.dns-parking.com`), zu bearbeiten unter
+## Step 1: DNS record ✅ done (2026-11-23)
+The zone `entreater.com` is managed at Hostinger (name servers `ns1.dns-parking.com`
+and `ns2.dns-parking.com`), editable at
 `hpanel.hostinger.com/domain/entreater.com/dns`.
 
-Vorhandenes Muster in der Zone:
+Existing pattern in the zone:
 
-| Typ | Name | Inhalt | TTL |
+| Type | Name | Content | TTL |
 |---|---|---|---|
 | A | `radar` | 187.127.69.57 | 14400 |
 | A | `portfolio` | 187.127.69.57 | 300 |
 | ALIAS | `@` | entreater.com.cdn.hstgr.net | 300 |
 
-Angelegt, nach dem Muster von `portfolio`:
+Created, following the pattern of `portfolio`:
 
-| Typ | Name | Inhalt | TTL | Status |
+| Type | Name | Content | TTL | Status |
 |---|---|---|---|---|
-| A | `adam` | 187.127.69.57 | 300 | aktiv seit 2026-11-23 |
+| A | `adam` | 187.127.69.57 | 300 | active since 2026-11-23 |
 
-Geprüft am 2026-11-23: Sowohl der autoritative Nameserver als auch ein öffentlicher
-Resolver liefern `187.127.69.57`.
+Checked on 2026-11-23: both the authoritative name server and a public
+resolver return `187.127.69.57`.
 
 ```bash
 dig +short adam.entreater.com                          # 187.127.69.57
-dig +short adam.entreater.com @ns1.dns-parking.com     # autoritativ
+dig +short adam.entreater.com @ns1.dns-parking.com     # authoritative
 ```
 
-Damit ist die Voraussetzung für das Let's-Encrypt-Zertifikat erfüllt: Die HTTP-Challenge
-kann den Namen auflösen, sobald der Container hinter Traefik läuft.
+This fulfills the prerequisite for the Let's Encrypt certificate: the HTTP challenge
+can resolve the name as soon as the container runs behind Traefik.
 
-## Schritt 2: Abbild bauen und starten
-Auf dem VPS, im Verzeichnis dieses Projekts:
+## Step 2: Build and start the image
+On the VPS, in the directory of this project:
 
 ```bash
 cd deploy
@@ -48,43 +48,43 @@ IDA_VERSION=$(git -C .. rev-parse --short HEAD) docker compose build
 IDA_VERSION=$(git -C .. rev-parse --short HEAD) docker compose up -d
 ```
 
-Der Datensatz wird beim Bauen eingebacken und über SHA-256 geprüft. Das Bauen braucht
-Netz, der Betrieb nicht.
+The dataset is baked in at build time and verified via SHA-256. Building needs
+network, running does not.
 
-## Schritt 3: Prüfen
+## Step 3: Verify
 ```bash
-docker compose ps                                  # Status und Healthcheck
+docker compose ps                                  # status and healthcheck
 docker compose logs --tail 50 adam
-curl -s https://adam.entreater.com/health          # erwartet {"status":"ok",...}
+curl -s https://adam.entreater.com/health          # expects {"status":"ok",...}
 ```
 
-Das Zertifikat kann beim ersten Aufruf einige Sekunden brauchen.
+The certificate may take a few seconds on the first request.
 
-## Auflagen für den öffentlichen Betrieb
-Diese Punkte gelten als Anforderungen an jedes Spec, das hier veröffentlicht wird:
+## Requirements for public operation
+These points count as requirements for every spec that is published here:
 
-1. **Nur öffentliche Daten.** Grundlage ist ausschließlich der IDC-Datensatz (CC BY 4.0).
-   Keine internen, unveröffentlichten oder vertraulichen Datensammlungen.
-2. **Namensnennung sichtbar.** Jede Seite nennt Quelle, Lizenz und DOI im Fuß.
-   Das ist eine Lizenzpflicht, kein Schmuck.
-3. **Hinweis auf den Kontext.** Die Seite stellt klar, dass ADA-Raten verschiedener
-   Therapeutika ohne klinischen Kontext nicht vergleichbar sind, und dass die Darstellung
-   der Forschung dient und keine medizinische oder regulatorische Aussage trifft.
-4. **Keine Verwechslung mit internen Werkzeugen.** Die Seite erweckt nicht den Eindruck,
-   ein firmeninternes Vorhersagemodell oder nicht veröffentlichte Daten zu enthalten.
-5. **Nur Lesen.** Keine Anmeldung, keine Formulare mit Speicherung, kein Schreibzugriff.
-   Der Container läuft mit `read_only: true` und ohne Rootrechte.
-6. **Keine personenbezogenen Daten**, auch nicht in Protokollen. Traefik ist bereits so
-   eingestellt, dass Kopfzeilen und Abfrageparameter nicht mitgeschrieben werden.
-7. **Ressourcen begrenzt.** 512 MB Arbeitsspeicher und 0,5 CPU, weil der Server knapp
-   bei Speicher ist und keinen Swap hat.
+1. **Only public data.** The basis is exclusively the IDC dataset (CC BY 4.0).
+   No internal, unpublished or confidential data collections.
+2. **Visible attribution.** Every page names source, license and DOI in the footer.
+   This is a license obligation, not decoration.
+3. **Context notice.** The page makes clear that ADA rates of different
+   therapeutics are not comparable without clinical context, and that the presentation
+   serves research and makes no medical or regulatory statement.
+4. **No confusion with internal tools.** The page does not give the impression of
+   containing a company-internal prediction model or unpublished data.
+5. **Read-only.** No login, no forms with storage, no write access.
+   The container runs with `read_only: true` and without root privileges.
+6. **No personal data**, not even in logs. Traefik is already configured
+   so that headers and query parameters are not logged.
+7. **Limited resources.** 512 MB of memory and 0.5 CPU, because the server is short
+   on memory and has no swap.
 
-## Reihenfolge im Factory-Ablauf
-Die Veröffentlichung ist **kein Agentenschritt**. Die Factory baut, prüft und liefert
-einen Pull Request. Nach deinem Merge auf `main` erfolgt die Bereitstellung als bewusster
-Schritt, zunächst von Hand nach dieser Anleitung. Erst wenn der Ablauf mehrere Wochen
-stabil läuft, lohnt sich eine Automatisierung.
+## Order in the factory flow
+Publishing is **not an agent step**. The factory builds, verifies and delivers
+a pull request. After your merge to `main`, deployment happens as a deliberate
+step, initially by hand following these instructions. Only once the flow has run
+stably for several weeks is automation worthwhile.
 
-Empfohlen: zuerst das Grundgerüst öffentlich stellen, solange es nur `/health` kennt.
-Dann ist die Kette aus DNS, Zertifikat, Traefik und Container bewiesen, bevor die erste
-Fachfunktion dazukommt.
+Recommended: first make the skeleton public while it only knows `/health`.
+Then the chain of DNS, certificate, Traefik and container is proven before the first
+domain feature is added.

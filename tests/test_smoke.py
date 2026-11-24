@@ -1,4 +1,4 @@
-"""Rauchtest des Grundgerüsts."""
+"""Smoke test of the skeleton."""
 
 from __future__ import annotations
 

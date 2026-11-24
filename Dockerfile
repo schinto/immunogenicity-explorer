@@ -1,8 +1,8 @@
-# Laufzeit-Abbild für den öffentlichen Betrieb unter adam.entreater.com
+# Runtime image for public operation at adam.entreater.com
 #
-# Der Datensatz wird beim Bauen eingebacken und dabei über SHA-256 geprüft
-# (scripts/fetch_data.py). Das Abbild ist damit unveränderlich und braucht zur
-# Laufzeit kein Netz. Lizenz der Daten: CC BY 4.0, siehe DATA.md.
+# The dataset is baked in at build time and verified via SHA-256
+# (scripts/fetch_data.py). The image is therefore immutable and needs no network
+# at runtime. Data license: CC BY 4.0, see DATA.md.
 FROM python:3.13-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -12,17 +12,17 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Abhängigkeiten zuerst, damit die Docker-Schicht beim Codeänderungen erhalten bleibt
+# Dependencies first, so the Docker layer is kept on code changes
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
-# Datensatz einbacken (Netz nur beim Bauen, Prüfsummen fest)
+# Bake in the dataset (network only at build time, fixed checksums)
 COPY scripts ./scripts
 COPY DATA.md ./
 RUN python scripts/fetch_data.py
 
-# Ohne Rootrechte betreiben
+# Run without root privileges
 RUN useradd --system --create-home --uid 10001 ida && chown -R ida:ida /app
 USER ida
 

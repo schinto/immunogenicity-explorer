@@ -1,72 +1,72 @@
 # AGENTS.md
 
-Inhaltsverzeichnis für Agenten. Kurz halten. Details stehen in den verlinkten Dateien.
+Table of contents for agents. Keep it short. Details are in the linked files.
 
-## Was dieses Projekt ist
-Ein Web-Explorer für klinische Immunogenitätsdaten (Anti-Drug-Antibody-Raten) auf Basis des
-öffentlichen IDC-Datensatzes. Zweck: sichtbar machen, dass ein Molekül je nach klinischem
-Kontext sehr unterschiedliche ADA-Raten zeigt.
+## What this project is
+A web explorer for clinical immunogenicity data (anti-drug antibody rates) based on the
+public IDC dataset. Purpose: make visible that a molecule shows very different ADA rates
+depending on the clinical context.
 
-- Datenquelle, Lizenz und Zitierpflicht: [DATA.md](DATA.md)
-- Fachlicher Hintergrund und Scope: [README.md](README.md)
-- Specs (verbindlich, eingefroren): `specs/<nnn>-<name>/spec.md`
+- Data source, license and citation requirement: [DATA.md](DATA.md)
+- Domain background and scope: [README.md](README.md)
+- Specs (binding, frozen): `specs/<nnn>-<name>/spec.md`
 
 ## Stack
-- Python >= 3.11, Abhängigkeiten über `uv`
-- FastAPI + Jinja2 (serverseitig gerendertes HTML, kein Frontend-Framework)
-- pandas für das Laden der CSV-Dateien
-- pytest für Tests, ruff für Format und Lint
+- Python >= 3.11, dependencies via `uv`
+- FastAPI + Jinja2 (server-side rendered HTML, no frontend framework)
+- pandas for loading the CSV files
+- pytest for tests, ruff for format and lint
 
-## Befehle
+## Commands
 ```bash
-uv sync                  # Abhängigkeiten installieren
-./check.sh               # das Gate: Format, Lint, Tests. Muss grün sein.
-uv run python scripts/fetch_data.py   # Datensatz nach data/idc/ laden (Netz nötig)
-uv run uvicorn ida.app:app --reload   # lokal starten
+uv sync                  # install dependencies
+./check.sh               # the gate: format, lint, tests. Must be green.
+uv run python scripts/fetch_data.py   # load the dataset into data/idc/ (network required)
+uv run uvicorn ida.app:app --reload   # start locally
 ```
 
-## Regeln für Agenten
-1. **Das Spec ist der Vertrag.** Niemals eine Datei unter `specs/` ändern. Wenn das Spec
-   unklar oder widersprüchlich ist: Karte blocken und fragen, nicht raten.
-2. **`./check.sh` muss grün sein**, bevor du ein Review anforderst. Die letzte Zeile der
-   Ausgabe gehört als Beleg in die Übergabe.
-3. **`git status --porcelain` muss leer sein**, bevor du ein Review anforderst. Alles
-   committen, was zur Karte gehört.
-4. **Tests nie abschwächen.** Keine Tests löschen, kein `skip`, kein `xfail`, keine
-   Assertion entfernen, um grün zu werden. Wenn ein Test zu Recht fehlschlägt, ist der
-   Code falsch, nicht der Test.
-5. **Erst der Test, dann der Code.** Jedes Akzeptanzkriterium bekommt mindestens einen Test.
-6. **Keine Hintergrundprozesse, kein `sleep`.** Server im Test nur über den TestClient.
-7. **Höchstens 3 Versuche** für denselben Befehl. Danach Ansatz wechseln oder blocken.
-8. **Keine Netzzugriffe in Tests.** Tests nutzen die Fixtures unter `tests/fixtures/`.
-9. **Keine neuen Abhängigkeiten** ohne Nennung im Spec oder Rückfrage.
-10. **Nur das umsetzen, was im Spec steht.** Keine Zusatzfeatures, keine Umbauten
-    außerhalb des Scopes.
+## Rules for agents
+1. **The spec is the contract.** Never change a file under `specs/`. If the spec is
+   unclear or contradictory: block the card and ask, do not guess.
+2. **`./check.sh` must be green** before you request a review. The last line of the
+   output belongs in the handover as evidence.
+3. **`git status --porcelain` must be empty** before you request a review. Commit
+   everything that belongs to the card.
+4. **Never weaken tests.** Do not delete tests, no `skip`, no `xfail`, do not remove an
+   assertion to get green. If a test fails for a good reason, the code is wrong, not
+   the test.
+5. **Test first, then code.** Every acceptance criterion gets at least one test.
+6. **No background processes, no `sleep`.** Servers in tests only via the TestClient.
+7. **At most 3 attempts** for the same command. Then change approach or block.
+8. **No network access in tests.** Tests use the fixtures under `tests/fixtures/`.
+9. **No new dependencies** unless named in the spec or after asking.
+10. **Only implement what is in the spec.** No extra features, no restructuring
+    outside the scope.
 
-## Datenregeln
-- Die Rohdaten unter `data/idc/` sind **nicht** im Repo und werden nie committet.
-- Die ADA-Häufigkeit ist im Datensatz in **Prozent** angegeben (0 bis 100), nicht als Anteil.
-- Zeilen ohne `Number of Patients analyzed for ADA` sind keine Kohorte mit Messwert und
-  werden nicht als solche gezählt.
-- Fehlende Werte niemals auf 0 setzen. Fehlend ist fehlend.
-- ADA-Raten verschiedener Therapeutika sind nicht direkt vergleichbar. Die Oberfläche darf
-  keine Rangliste suggerieren, die den klinischen Kontext weglässt.
+## Data rules
+- The raw data under `data/idc/` is **not** in the repo and is never committed.
+- The ADA frequency is given in the dataset as a **percentage** (0 to 100), not as a fraction.
+- Rows without `Number of Patients analyzed for ADA` are not a cohort with a measured value
+  and are not counted as such.
+- Never set missing values to 0. Missing is missing.
+- ADA rates of different therapeutics are not directly comparable. The interface must not
+  suggest a ranking that omits the clinical context.
 
-## Öffentlicher Betrieb
-Diese Anwendung wird unter `adam.entreater.com` öffentlich erreichbar sein. Daraus folgt
-für jede Änderung:
-- Keine Geheimnisse im Code, in Vorlagen oder in Protokollausgaben.
-- Keine Schreibzugriffe aufs Dateisystem zur Laufzeit. Der Container läuft mit
+## Public operation
+This application will be publicly reachable at `adam.entreater.com`. This implies for
+every change:
+- No secrets in code, in templates or in log output.
+- No writes to the file system at runtime. The container runs with
   `read_only: true`.
-- Quellenangabe, Lizenz und Kontexthinweis bleiben auf jeder Seite sichtbar.
-- Keine personenbezogenen Daten, auch nicht in Logzeilen.
-Die vollständigen Auflagen stehen in [deploy/README.md](deploy/README.md).
+- Source attribution, license and context notice remain visible on every page.
+- No personal data, not even in log lines.
+The full requirements are in [deploy/README.md](deploy/README.md).
 
-## Verzeichnisse
+## Directories
 ```
-src/ida/        Anwendungscode (Paket "ida")
-tests/          pytest; tests/fixtures/ enthält kleine CSV-Auszüge
-scripts/        Hilfsskripte (Datenabruf)
-specs/          Specs, eingefroren. specs/TEMPLATE.md ist die Vorlage.
-data/idc/       Rohdaten, nicht im Repo
+src/ida/        application code (package "ida")
+tests/          pytest; tests/fixtures/ contains small CSV excerpts
+scripts/        helper scripts (data retrieval)
+specs/          specs, frozen. specs/TEMPLATE.md is the template.
+data/idc/       raw data, not in the repo
 ```

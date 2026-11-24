@@ -1,6 +1,6 @@
-"""FastAPI-Anwendung.
+"""FastAPI application.
 
-Grundgerüst. Die Endpunkte der Oberfläche entstehen pro Spec unter specs/.
+Skeleton. The UI endpoints are added per spec under specs/.
 """
 
 from __future__ import annotations
@@ -14,5 +14,5 @@ app = FastAPI(title="Immunogenicity Explorer", version=__version__)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Lebenszeichen für Betrieb und Abnahmetests."""
+    """Liveness signal for operations and acceptance tests."""
     return {"status": "ok", "version": __version__}

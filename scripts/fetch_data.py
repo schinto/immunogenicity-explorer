@@ -1,9 +1,9 @@
-"""Lädt den öffentlichen IDC-Datensatz aus einem gepinnten Commit nach data/idc/.
+"""Loads the public IDC dataset from a pinned commit into data/idc/.
 
-Prüft jede Datei über SHA-256. Bei Abweichung bricht das Skript mit Exitcode 1 ab,
-damit eine stillschweigend geänderte Datenbasis auffällt.
+Verifies every file via SHA-256. On a mismatch the script aborts with exit code 1,
+so that a silently changed data basis is noticed.
 
-Quelle und Lizenz (CC BY 4.0): siehe DATA.md
+Source and license (CC BY 4.0): see DATA.md
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ REPO = "Immunogenicity-Database-Collaborative/IDC-DB"
 PINNED_REF = "f5a381206c37585b1fd2f120d9b188c86360534a"
 BASE_URL = f"https://raw.githubusercontent.com/{REPO}/{PINNED_REF}"
 
-# Dateiname -> SHA-256 des Inhalts im gepinnten Commit
+# File name -> SHA-256 of the content in the pinned commit
 FILES: dict[str, str] = {
     "therapeutics.csv": "6641dc2fa89fa4cebe6453658351d7a3e222f26e292a826a19e4b87741ded5d7",
     "clinical_trials.csv": "5b6433c2378cf1e3787253eea4b24eed7eccb2aaf5e932d69516258ad87d4c3f",
@@ -37,29 +37,29 @@ def sha256(data: bytes) -> str:
 def fetch(name: str, expected: str, target_dir: Path) -> None:
     target = target_dir / name
     if target.exists() and sha256(target.read_bytes()) == expected:
-        print(f"ok (vorhanden)  {name}")
+        print(f"ok (present)    {name}")
         return
 
     url = f"{BASE_URL}/data/{name}"
-    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 - feste HTTPS-URL
+    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 - fixed HTTPS URL
         payload = response.read()
 
     actual = sha256(payload)
     if actual != expected:
         raise SystemExit(
-            f"FEHLER: Prüfsumme von {name} weicht ab.\n  erwartet: {expected}\n  erhalten: {actual}"
+            f"ERROR: checksum of {name} differs.\n  expected: {expected}\n  received: {actual}"
         )
 
     target.write_bytes(payload)
-    print(f"ok (geladen)    {name}  {len(payload) / 1_000_000:.1f} MB")
+    print(f"ok (loaded)     {name}  {len(payload) / 1_000_000:.1f} MB")
 
 
 def main() -> int:
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     for name, expected in FILES.items():
         fetch(name, expected, TARGET_DIR)
-    print(f"\nDatensatz liegt in {TARGET_DIR}")
-    print("Lizenz CC BY 4.0, Zitierpflicht siehe DATA.md")
+    print(f"\nDataset is in {TARGET_DIR}")
+    print("License CC BY 4.0, citation requirement see DATA.md")
     return 0
 
 

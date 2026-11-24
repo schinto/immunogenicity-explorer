@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Das Gate. Muss grün sein, bevor ein Review angefordert wird.
-# Deterministisch, ohne Netzzugriff, ohne Hintergrundprozesse.
+# The gate. Must be green before a review is requested.
+# Deterministic, without network access, without background processes.
 set -euo pipefail
 
 cd "$(dirname "$0")"

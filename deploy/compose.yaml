@@ -1,11 +1,11 @@
-# Öffentliche Bereitstellung unter adam.entreater.com auf dem VPS.
+# Public deployment at adam.entreater.com on the VPS.
 #
-# Muster übernommen von radar.entreater.com auf demselben Server: Traefik erkennt den
-# Container über Labels und holt das Zertifikat per Let's Encrypt (HTTP-Challenge).
-# Traefik läuft dort mit --providers.docker.exposedbydefault=false, deshalb ist
-# traefik.enable=true nötig.
+# Pattern taken from radar.entreater.com on the same server: Traefik detects the
+# container via labels and obtains the certificate via Let's Encrypt (HTTP challenge).
+# Traefik runs there with --providers.docker.exposedbydefault=false, so
+# traefik.enable=true is required.
 #
-# Voraussetzungen und Reihenfolge: siehe deploy/README.md
+# Prerequisites and order: see deploy/README.md
 services:
   adam:
     image: immunogenicity-explorer:${IDA_VERSION:-dev}
@@ -15,17 +15,17 @@ services:
     container_name: adam-explorer
     restart: unless-stopped
 
-    # Begrenzung, weil der Server knapp bei Arbeitsspeicher ist und keinen Swap hat.
+    # Limit, because the server is short on memory and has no swap.
     mem_limit: 512m
     memswap_limit: 512m
     cpus: 0.5
 
-    # Bei Speichermangel auf dem ganzen Server vor den produktiven Diensten beenden,
-    # aber nach den Factory-Containern (die haben 1000). Die Seite ist zustandslos
-    # und startet über restart: unless-stopped von selbst neu.
+    # On server-wide memory pressure, get killed before the production services,
+    # but after the factory containers (those have 1000). The site is stateless
+    # and restarts on its own via restart: unless-stopped.
     oom_score_adj: 500
 
-    # Die Anwendung ist reines Lesen. Kein Schreibzugriff ins Dateisystem nötig.
+    # The application is read-only. No write access to the file system needed.
     read_only: true
     tmpfs:
       - /tmp:size=32m
@@ -46,14 +46,14 @@ services:
       - traefik.http.routers.adam.entrypoints=websecure
       - traefik.http.routers.adam.tls.certresolver=letsencrypt
       - traefik.http.services.adam.loadbalancer.server.port=8000
-      # Sicherheitsheader und Komprimierung
+      # Security headers and compression
       - traefik.http.routers.adam.middlewares=adam-headers,adam-compress,adam-ratelimit
       - traefik.http.middlewares.adam-headers.headers.stsSeconds=31536000
       - traefik.http.middlewares.adam-headers.headers.contentTypeNosniff=true
       - traefik.http.middlewares.adam-headers.headers.browserXssFilter=true
       - traefik.http.middlewares.adam-headers.headers.referrerPolicy=no-referrer
       - traefik.http.middlewares.adam-compress.compress=true
-      # Schutz gegen einfache Lastspitzen auf einem kleinen Server
+      # Protection against simple load spikes on a small server
       - traefik.http.middlewares.adam-ratelimit.ratelimit.average=30
       - traefik.http.middlewares.adam-ratelimit.ratelimit.burst=60
 

@@ -1,7 +1,7 @@
-"""Gemeinsame Test-Fixtures.
+"""Shared test fixtures.
 
-Tests laufen ohne Netz. Die CSV-Auszüge unter tests/fixtures/ stammen aus dem
-öffentlichen IDC-Datensatz (CC BY 4.0), siehe DATA.md.
+Tests run without network. The CSV excerpts under tests/fixtures/ come from the
+public IDC dataset (CC BY 4.0), see DATA.md.
 """
 
 from __future__ import annotations
@@ -15,17 +15,17 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def fixture_dir() -> Path:
-    """Verzeichnis mit den CSV-Auszügen für Tests."""
+    """Directory with the CSV excerpts for tests."""
     return FIXTURE_DIR
 
 
 @pytest.fixture
 def cohorts_csv() -> Path:
-    """Auszug aus clinical_trials.csv: 33 Zeilen, davon 30 mit ADA-Messwert."""
+    """Excerpt from clinical_trials.csv: 33 rows, 30 of them with an ADA measurement."""
     return FIXTURE_DIR / "clinical_trials.sample.csv"
 
 
 @pytest.fixture
 def therapeutics_csv() -> Path:
-    """Auszug aus therapeutics.csv, passend zu den Wirkstoffen in cohorts_csv."""
+    """Excerpt from therapeutics.csv, matching the active substances in cohorts_csv."""
     return FIXTURE_DIR / "therapeutics.sample.csv"

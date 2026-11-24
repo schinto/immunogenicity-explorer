@@ -1,45 +1,45 @@
-# Spec <nnn>: <Titel>
+# Spec <nnn>: <Title>
 
-| Feld | Wert |
+| Field | Value |
 |---|---|
-| Status | Entwurf / **eingefroren** / umgesetzt |
-| Risiko | low / medium / high |
-| Eingefroren am | JJJJ-MM-TT |
+| Status | Draft / **frozen** / implemented |
+| Risk | low / medium / high |
+| Frozen on | YYYY-MM-DD |
 
-## Ziel
-Ein bis drei Sätze: Was kann ein Nutzer danach, was vorher nicht ging?
+## Goal
+One to three sentences: what can a user do afterwards that was not possible before?
 
-## Nicht-Ziele
-Was ausdrücklich **nicht** Teil dieses Specs ist. Verhindert Scope-Ausweitung.
+## Non-goals
+What is explicitly **not** part of this spec. Prevents scope creep.
 
-## Kontext
-Was der Umsetzende wissen muss: fachliche Hintergründe, relevante Datenfelder mit exakten
-Spaltennamen, Besonderheiten der Daten, bestehende Bausteine im Code.
+## Context
+What the implementer needs to know: domain background, relevant data fields with exact
+column names, peculiarities of the data, existing building blocks in the code.
 
-## Akzeptanzkriterien
-Jedes Kriterium ist **maschinell prüfbar** und bekommt mindestens einen Test.
-Form: Gegeben / Wenn / Dann.
+## Acceptance criteria
+Every criterion is **machine-checkable** and gets at least one test.
+Form: Given / When / Then.
 
-- **AK1** Gegeben … Wenn … Dann …
-- **AK2** …
+- **AC1** Given … When … Then …
+- **AC2** …
 
-## Datei-Plan
-Welche Dateien entstehen oder werden geändert, mit einem Satz Zweck je Datei.
+## File plan
+Which files are created or changed, with one sentence of purpose per file.
 
-| Datei | Zweck |
+| File | Purpose |
 |---|---|
 | `src/...` | … |
 | `tests/...` | … |
 
-## Zerlegung (Vorschlag)
-Kleine Inkremente, je höchstens etwa 200 Zeilen Diff, jedes einzeln testbar.
+## Breakdown (proposal)
+Small increments, each at most about 200 lines of diff, each testable on its own.
 
 1. …
 2. …
 
-## Risiken und offene Punkte
-Was schiefgehen kann, und was bei Unklarheit zu tun ist (blocken und fragen).
+## Risks and open points
+What can go wrong, and what to do when unclear (block and ask).
 
-## Abnahme
-Wie wird am Ende geprüft, ob das Spec erfüllt ist? Verweis auf die Holdout-Szenarien,
-die außerhalb dieses Repos liegen.
+## Acceptance
+How is it verified at the end that the spec is fulfilled? Reference to the holdout scenarios,
+which live outside this repo.
