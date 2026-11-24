@@ -1,46 +1,21 @@
 # Public deployment at adam.entreater.com
 
-## Starting point on the VPS (checked on 2026-11-23)
-- Public IP of the server: **187.127.69.57**
-- `radar.entreater.com` points to **exactly this IP** and is served via Traefik
-  (containers `causal-radar-platform-wikijs-1` and `causal-radar-platform-diagrams-1`).
-- Traefik runs as container `traefik-traefik-1` in the host network, with the Docker provider,
-  `exposedbydefault=false`, automatic redirection from HTTP to HTTPS and
-  Let's Encrypt via the HTTP challenge.
-- `adam.entreater.com` has been registered since 2026-11-23 and resolves (see step 1).
-
-## Step 1: DNS record ✅ done (2026-11-23)
-The zone `entreater.com` is managed at Hostinger (name servers `ns1.dns-parking.com`
-and `ns2.dns-parking.com`), editable at
-`hpanel.hostinger.com/domain/entreater.com/dns`.
-
-Existing pattern in the zone:
-
-| Type | Name | Content | TTL |
-|---|---|---|---|
-| A | `radar` | 187.127.69.57 | 14400 |
-| A | `portfolio` | 187.127.69.57 | 300 |
-| ALIAS | `@` | entreater.com.cdn.hstgr.net | 300 |
-
-Created, following the pattern of `portfolio`:
-
-| Type | Name | Content | TTL | Status |
-|---|---|---|---|---|
-| A | `adam` | 187.127.69.57 | 300 | active since 2026-11-23 |
-
-Checked on 2026-11-23: both the authoritative name server and a public
-resolver return `187.127.69.57`.
+## Prerequisites
+- A server with Docker and a reverse proxy that routes by host name and obtains
+  certificates automatically. `compose.yaml` carries labels for **Traefik** with the Docker
+  provider (`exposedbydefault=false`) and a Let's Encrypt resolver named `letsencrypt`.
+- A DNS **A record** for the host name pointing to the server. The Let's Encrypt HTTP
+  challenge can only succeed once the name resolves:
 
 ```bash
-dig +short adam.entreater.com                          # 187.127.69.57
-dig +short adam.entreater.com @ns1.dns-parking.com     # authoritative
+dig +short adam.entreater.com      # must return the server's IP address
 ```
 
-This fulfills the prerequisite for the Let's Encrypt certificate: the HTTP challenge
-can resolve the name as soon as the container runs behind Traefik.
+Operator-specific details (server, DNS zone, neighbouring services) are deliberately not
+part of this public repository.
 
-## Step 2: Build and start the image
-On the VPS, in the directory of this project:
+## Step 1: Build and start the image
+On the server, in the directory of this project:
 
 ```bash
 cd deploy
@@ -51,7 +26,7 @@ IDA_VERSION=$(git -C .. rev-parse --short HEAD) docker compose up -d
 The dataset is baked in at build time and verified via SHA-256. Building needs
 network, running does not.
 
-## Step 3: Verify
+## Step 2: Verify
 ```bash
 docker compose ps                                  # status and healthcheck
 docker compose logs --tail 50 adam
@@ -76,7 +51,7 @@ These points count as requirements for every spec that is published here:
    The container runs with `read_only: true` and without root privileges.
 6. **No personal data**, not even in logs. Traefik is already configured
    so that headers and query parameters are not logged.
-7. **Limited resources.** 512 MB of memory and 0.5 CPU, because the server is short
+7. **Limited resources.** 512 MB of memory and 0.5 CPU, because the target server is short
    on memory and has no swap.
 
 ## Order in the factory flow

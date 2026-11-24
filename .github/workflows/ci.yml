@@ -1,10 +1,13 @@
 # CI gate of the Software Factory.
 #
-# Runs on the self-hosted runner on the VPS (container factory-github-runner).
-# Consumes no GitHub Actions minutes. Only for private repositories.
+# Runs on GitHub-hosted runners. The repository is public, so GitHub Actions
+# minutes are free and no self-hosted runner is needed.
 #
-# The "check" check is the contract: Hermes may complete a card only
-# when it is green on the current commit (--completion-contract).
+# The "check" check is the contract: Hermes may complete a card only when it is
+# green on the current commit (--completion-contract), and the ruleset on main
+# requires it before a pull request can be merged.
+#
+# Third-party actions are pinned to full commit SHAs.
 
 name: check
 
@@ -22,13 +25,18 @@ concurrency:
 
 jobs:
   check:
-    runs-on: [self-hosted, linux, factory]
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the tamper check diffs the pull request against its base.
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Provide uv
-        run: command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
 
       - name: Run gate
         run: ./check.sh
