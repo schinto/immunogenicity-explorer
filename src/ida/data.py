@@ -1,4 +1,4 @@
-"""Loading cohorts from the IDC dataset.
+"""Loading and filtering cohorts from the IDC dataset.
 
 The CSV file contains line breaks inside fields, so it is read with pandas'
 CSV parser, never line by line. Column names are used exactly as in the dataset.
@@ -6,11 +6,17 @@ CSV parser, never line by line. Column names are used exactly as in the dataset.
 
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Generic, TypeVar
 
 import pandas as pd
 
 from ida.models import Cohort
+
+#: Number of items on one page of the table and the JSON interface.
+PAGE_SIZE = 50
 
 COL_ROW_ID = "IDC Row identifier"
 COL_TRIAL_ID = "Trial ID"
@@ -50,25 +56,69 @@ def _text(value: object) -> str | None:
     return text or None
 
 
-def _to_int(value: object) -> int | None:
+class DataFormatError(ValueError):
+    """Raised when a measured row holds a value that does not follow the number rules.
+
+    The message names the row identifier and the column, nothing else.
+    """
+
+    def __init__(self, row_id: str | None, column: str, value: str) -> None:
+        self.row_id = row_id
+        self.column = column
+        super().__init__(f"Invalid value {value!r} in column {column!r} for row {row_id!r}")
+
+
+def _to_number(value: object, *, row_id: str | None, column: str) -> float | None:
+    """Parse a finite decimal number, raising `DataFormatError` for anything else."""
     text = _text(value)
     if text is None:
         return None
-    return int(float(text))
+    try:
+        number = float(text)
+    except ValueError as error:
+        raise DataFormatError(row_id, column, text) from error
+    if not math.isfinite(number):
+        raise DataFormatError(row_id, column, text)
+    return number
 
 
-def _to_float(value: object) -> float | None:
-    text = _text(value)
-    if text is None:
+def _to_whole(value: object, *, row_id: str | None, column: str) -> int | None:
+    """Parse a whole number >= 0; `25` and `25.0` both load as `25`."""
+    number = _to_number(value, row_id=row_id, column=column)
+    if number is None:
         return None
-    return float(text)
+    if number < 0 or not number.is_integer():
+        raise DataFormatError(row_id, column, str(_text(value)))
+    return int(number)
+
+
+def _to_count(value: object, *, row_id: str | None, column: str) -> int | float | None:
+    """Parse a count >= 0; a whole value loads as `int`, a non-whole one as `float`."""
+    number = _to_number(value, row_id=row_id, column=column)
+    if number is None:
+        return None
+    if number < 0:
+        raise DataFormatError(row_id, column, str(_text(value)))
+    if number.is_integer():
+        return int(number)
+    return number
+
+
+def _to_frequency(value: object, *, row_id: str | None, column: str) -> float | None:
+    """Parse an ADA rate in percent: a finite number between 0 and 100 inclusive."""
+    number = _to_number(value, row_id=row_id, column=column)
+    if number is None:
+        return None
+    if not 0.0 <= number <= 100.0:
+        raise DataFormatError(row_id, column, str(_text(value)))
+    return number
 
 
 def load_cohorts(path: str | Path) -> list[Cohort]:
     """Load the cohorts with a measured ADA value from a `clinical_trials.csv` file.
 
     Rows without a value in `Number of Patients analyzed for ADA` are not a
-    cohort with a measured value and are dropped.
+    cohort with a measured value and are dropped before any validation.
     """
     frame = pd.read_csv(
         path,
@@ -84,16 +134,89 @@ def load_cohorts(path: str | Path) -> list[Cohort]:
 
     measured = frame[frame[COL_N_ANALYZED].str.strip() != ""]
 
-    return [
-        Cohort(
-            row_id=_text(row[COL_ROW_ID]),
-            trial_id=_text(row[COL_TRIAL_ID]),
-            inn_name=_text(row[COL_INN_NAME]),
-            indication_category=_text(row[COL_INDICATION]),
-            route=_text(row[COL_ROUTE]),
-            n_analyzed=_to_int(row[COL_N_ANALYZED]),
-            n_ada_positive=_to_int(row[COL_N_ADA_POSITIVE]),
-            ada_frequency_percent=_to_float(row[COL_FREQUENCY]),
+    cohorts: list[Cohort] = []
+    for _, row in measured.iterrows():
+        row_id = _text(row[COL_ROW_ID])
+        cohorts.append(
+            Cohort(
+                row_id=row_id,
+                trial_id=_text(row[COL_TRIAL_ID]),
+                inn_name=_text(row[COL_INN_NAME]),
+                indication_category=_text(row[COL_INDICATION]),
+                route=_text(row[COL_ROUTE]),
+                n_analyzed=_to_whole(row[COL_N_ANALYZED], row_id=row_id, column=COL_N_ANALYZED),
+                n_ada_positive=_to_count(
+                    row[COL_N_ADA_POSITIVE], row_id=row_id, column=COL_N_ADA_POSITIVE
+                ),
+                ada_frequency_percent=_to_frequency(
+                    row[COL_FREQUENCY], row_id=row_id, column=COL_FREQUENCY
+                ),
+            )
         )
-        for _, row in measured.iterrows()
-    ]
+    return cohorts
+
+
+def _normalized(value: str | None) -> str | None:
+    """Strip a filter parameter; an empty result means "no filter"."""
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
+
+
+def filter_cohorts(
+    cohorts: list[Cohort],
+    inn: str | None = None,
+    indication: str | None = None,
+    route: str | None = None,
+) -> list[Cohort]:
+    """Filter cohorts, keeping the input order and combining all filters with AND.
+
+    `inn` matches as a case-insensitive substring, `indication` and `route`
+    match exactly and case-sensitively. A cohort whose field is missing never
+    matches an active filter on that field.
+    """
+    inn_needle = _normalized(inn)
+    inn_needle = inn_needle.lower() if inn_needle is not None else None
+    indication_value = _normalized(indication)
+    route_value = _normalized(route)
+
+    def matches(cohort: Cohort) -> bool:
+        if inn_needle is not None and (
+            cohort.inn_name is None or inn_needle not in cohort.inn_name.lower()
+        ):
+            return False
+        if indication_value is not None and cohort.indication_category != indication_value:
+            return False
+        return route_value is None or cohort.route == route_value
+
+    return [cohort for cohort in cohorts if matches(cohort)]
+
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class Page(Generic[T]):
+    """One page of items plus the total number of items before pagination."""
+
+    total: int
+    page: int
+    page_size: int
+    items: list[T]
+
+
+def paginate(items: list[T], page: int) -> Page[T]:
+    """Return the 1-based `page` of `items`, `PAGE_SIZE` items per page.
+
+    A page beyond the last one holds an empty `items` list and the real `total`.
+    """
+    if page < 1:
+        raise ValueError(f"page must be >= 1, got {page}")
+    start = (page - 1) * PAGE_SIZE
+    return Page(
+        total=len(items),
+        page=page,
+        page_size=PAGE_SIZE,
+        items=list(items[start : start + PAGE_SIZE]),
+    )
