@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Immunogenicity Explorer</title>
+</head>
+<body>
+<main>
+{% block content %}{% if message is defined %}<p id="unavailable">{{ message }}</p>{% endif %}{% endblock %}
+</main>
+<footer id="footer">
+<p>Source: Immunogenicity Database Collaborative. License: CC BY 4.0. DOI: 10.3389/fimmu.2026.1816949</p>
+</footer>
+<p id="context-notice">ADA rates of different therapeutics are not comparable without their clinical context. This page serves research only and makes no medical or regulatory statement.</p>
+</body>
+</html>

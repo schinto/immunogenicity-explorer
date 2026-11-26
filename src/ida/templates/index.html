@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Cohort table</h1>
+<p id="total">{{ page.total }} results</p>
+{% if not page.items %}<p id="empty">No results</p>{% endif %}
+<table id="cohorts">
+<thead>
+<tr>
+<th>Trial ID</th>
+<th>Active substance</th>
+<th>Indication category</th>
+<th>Route</th>
+<th>Patients analyzed</th>
+<th>ADA+ patients</th>
+<th>ADA rate (%)</th>
+</tr>
+</thead>
+<tbody>
+{% for cohort in page.items %}
+<tr>
+<td>{{ cohort.trial_id | dash }}</td>
+<td>{{ cohort.inn_name | dash }}</td>
+<td>{{ cohort.indication_category | dash }}</td>
+<td>{{ cohort.route | dash }}</td>
+<td>{{ cohort.n_analyzed | count }}</td>
+<td>{{ cohort.n_ada_positive | count }}</td>
+<td>{{ cohort.ada_frequency_percent | rate }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}
