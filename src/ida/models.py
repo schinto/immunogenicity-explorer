@@ -19,5 +19,5 @@ class Cohort:
     indication_category: str | None
     route: str | None
     n_analyzed: int | None
-    n_ada_positive: int | None
+    n_ada_positive: int | float | None
     ada_frequency_percent: float | None
