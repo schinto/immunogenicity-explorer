@@ -1,13 +1,14 @@
-"""Tests for the web interface (spec 001, AC9 to AC16b, AC22, AC22b).
+"""Tests for the web interface (spec 001, AC9 to AC16b, AC22 to AC24).
 
-The filter form and the page parameter belong to slice 4, the JSON interface to
-slice 5; this module covers the first rendered page of `GET /` and the
+The JSON interface belongs to slice 5; this module covers `GET /` with its
+filter form, the page parameter and the pagination links, and the
 unavailable-data handling.
 """
 
 from __future__ import annotations
 
 import csv
+import html as html_module
 import logging
 import re
 import shutil
@@ -102,12 +103,48 @@ def context_notice_text(html: str) -> str:
     return element_text(html, "context-notice")
 
 
-def synthetic_cohorts(make_cohort: Callable[..., Cohort], count: int) -> list[Cohort]:
+def synthetic_cohorts(
+    make_cohort: Callable[..., Cohort], count: int, **overrides: object
+) -> list[Cohort]:
     """Return `count` distinct synthetic cohorts in file order."""
     return [
-        make_cohort(row_id=f"CT{index:04d}_A1_001", trial_id=f"CT{index:04d}")
+        make_cohort(row_id=f"CT{index:04d}_A1_001", trial_id=f"CT{index:04d}", **overrides)
         for index in range(count)
     ]
+
+
+def tag_attributes(tag: str) -> dict[str, str]:
+    """Return the attributes of one HTML opening tag, keyed by name, unescaped."""
+    return {
+        name: html_module.unescape(value)
+        for name, value in re.findall(r'([a-zA-Z_:][-a-zA-Z0-9_:.]*)="([^"]*)"', tag)
+    }
+
+
+def pagination_links(html: str) -> dict[str, str]:
+    """Return the `href` of every link in `nav#pagination`, keyed by its text."""
+    nav = re.search(r'<nav id="pagination">(.*?)</nav>', without_comments(html), re.S)
+    assert nav is not None, "the page has no nav with id 'pagination'"
+    links: dict[str, str] = {}
+    for attributes, text in re.findall(r"<a\b([^>]*)>(.*?)</a>", nav.group(1), re.S):
+        html_attributes = tag_attributes(attributes)
+        assert "href" in html_attributes, "a pagination link has no href"
+        links[text.strip()] = html_attributes["href"]
+    return links
+
+
+def form_inputs(html: str) -> dict[str, str]:
+    """Return the value of every text input of the GET filter form, keyed by name."""
+    form = re.search(r"<form\b([^>]*)>(.*?)</form>", without_comments(html), re.S)
+    assert form is not None, "the page has no form"
+    form_attributes = tag_attributes(form.group(1))
+    assert form_attributes.get("method", "").lower() == "get", "the filter form must use GET"
+    inputs: dict[str, str] = {}
+    for opening_tag in re.findall(r"<input\b[^>]*>", form.group(2)):
+        attributes = tag_attributes(opening_tag)
+        assert attributes.get("type") == "text", "every filter input must be a text input"
+        inputs[attributes["name"]] = attributes.get("value", "")
+    return inputs
 
 
 def test_ac9_renders_the_thirty_fixture_cohorts(
@@ -135,6 +172,162 @@ def test_ac10_first_page_holds_fifty_of_120_cohorts(
     # The rows are the first page in file order.
     assert row_cells(rows[0])[0] == "CT0000"
     assert row_cells(rows[-1])[0] == "CT0049"
+
+
+def test_ac10b_pagination_starts_with_next_only(
+    use_cohorts: Callable[[list[Cohort]], TestClient], make_cohort: Callable[..., Cohort]
+) -> None:
+    """AC10b: page 1 links to page 2 and has no Previous link."""
+    cohorts = synthetic_cohorts(make_cohort, 120)
+    links = pagination_links(use_cohorts(cohorts).get("/").text)
+
+    assert "Previous" not in links
+    assert links["Next"] == "?page=2"
+
+
+def test_ac11_inn_filter_narrows_the_table_and_keeps_the_input(
+    use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
+) -> None:
+    """AC11: the `inn` filter narrows the table to the 4 Adalimumab rows."""
+    html = use_cohorts(load_cohorts(cohorts_csv)).get("/?inn=adalimumab").text
+
+    rows = table_body_rows(html)
+    assert len(rows) == 4
+    assert all("adalimumab" in row_cells(row)[1].lower() for row in rows)
+    assert text_of(html, "total") == "4 results"
+    assert form_inputs(html)["inn"] == "adalimumab"
+
+
+def test_ac12_unknown_inn_filter_renders_an_empty_table(
+    use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
+) -> None:
+    """AC12: a filter without matches is a 200 page with the empty notice."""
+    response = use_cohorts(load_cohorts(cohorts_csv)).get("/?inn=doesnotexist")
+
+    assert response.status_code == 200
+    assert table_body_rows(response.text) == []
+    assert text_of(response.text, "total") == "0 results"
+    assert text_of(response.text, "empty") == "No results"
+
+
+@pytest.mark.parametrize("query", ["page=0", "page=-1", "page=abc"])
+def test_ac13_invalid_page_is_rejected_with_422(
+    use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path, query: str
+) -> None:
+    """AC13: `page` below 1 or not an integer is answered with 422."""
+    response = use_cohorts(load_cohorts(cohorts_csv)).get(f"/?{query}")
+
+    assert response.status_code == 422
+
+
+def test_ac14_page_beyond_the_last_is_empty_but_keeps_the_total(
+    use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
+) -> None:
+    """AC14: page 2 of 30 cohorts is a 200 page with no rows and the real total."""
+    response = use_cohorts(load_cohorts(cohorts_csv)).get("/?page=2")
+
+    assert response.status_code == 200
+    assert table_body_rows(response.text) == []
+    assert text_of(response.text, "total") == "30 results"
+    assert text_of(response.text, "empty") == "No results"
+    links = pagination_links(response.text)
+    assert links["Previous"] == "?page=1"
+    assert "Next" not in links
+
+
+def test_ac23_pagination_links_keep_the_inn_filter(
+    use_cohorts: Callable[[list[Cohort]], TestClient], make_cohort: Callable[..., Cohort]
+) -> None:
+    """AC23: Next and Previous keep `inn=adalimumab` across the pages."""
+    cohorts = synthetic_cohorts(make_cohort, 120, inn_name="Adalimumab")
+
+    first = use_cohorts(cohorts).get("/?inn=adalimumab")
+    first_links = pagination_links(first.text)
+    assert "Previous" not in first_links
+    assert first_links["Next"] == "?inn=adalimumab&page=2"
+    assert form_inputs(first.text)["inn"] == "adalimumab"
+
+    second = use_cohorts(cohorts).get("/?inn=adalimumab&page=2")
+    second_links = pagination_links(second.text)
+    assert second_links["Previous"] == "?inn=adalimumab&page=1"
+    assert second_links["Next"] == "?inn=adalimumab&page=3"
+    # Page 2 holds the 51st to the 100th matching cohort, not the first page again.
+    rows = table_body_rows(second.text)
+    assert len(rows) == 50
+    assert row_cells(rows[0])[0] == "CT0050"
+
+
+def test_pagination_links_round_trip_filter_values_and_drop_blank_ones(
+    use_cohorts: Callable[[list[Cohort]], TestClient], make_cohort: Callable[..., Cohort]
+) -> None:
+    """The links encode spaces, `&` and `#` intact and omit blank filters."""
+    inn = "Mab & Co #1"
+    cohorts = synthetic_cohorts(make_cohort, 120, inn_name=inn)
+    response = use_cohorts(cohorts).get("/", params={"inn": inn, "indication": "", "route": "   "})
+
+    assert form_inputs(response.text) == {"inn": inn, "indication": "", "route": ""}
+    assert pagination_links(response.text)["Next"] == "?inn=Mab+%26+Co+%231&page=2"
+
+
+def test_indication_and_route_filters_are_applied_and_kept_in_pagination(
+    use_cohorts: Callable[[list[Cohort]], TestClient], make_cohort: Callable[..., Cohort]
+) -> None:
+    """Whitespace-padded `indication` and `route` filter independently and survive paging."""
+    matching = synthetic_cohorts(
+        make_cohort, 120, indication_category="Cancer and neoplasms", route="Subcutaneous"
+    )
+    decoys = [
+        # Right route, wrong indication: fails if `indication` is ignored.
+        make_cohort(
+            row_id="DECOY1_A1_001",
+            trial_id="DECOY1",
+            indication_category="Healthy volunteers",
+            route="Subcutaneous",
+        ),
+        # Right indication, wrong route: fails if `route` is ignored.
+        make_cohort(
+            row_id="DECOY2_A1_001",
+            trial_id="DECOY2",
+            indication_category="Cancer and neoplasms",
+            route="Intravenous",
+        ),
+    ]
+    cohorts = [*matching, *decoys]
+    params = {"indication": " Cancer and neoplasms ", "route": " Subcutaneous "}
+
+    first = use_cohorts(cohorts).get("/", params=params)
+    rows = table_body_rows(first.text)
+    assert len(rows) == 50
+    assert text_of(first.text, "total") == "120 results"
+    assert row_cells(rows[0])[0] == "CT0000"
+    assert form_inputs(first.text) == {
+        "inn": "",
+        "indication": "Cancer and neoplasms",
+        "route": "Subcutaneous",
+    }
+    first_links = pagination_links(first.text)
+    assert "Previous" not in first_links
+    assert first_links["Next"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=2"
+
+    second = use_cohorts(cohorts).get("/", params={**params, "page": "2"})
+    second_links = pagination_links(second.text)
+    assert second_links["Previous"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=1"
+    assert second_links["Next"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=3"
+    assert row_cells(table_body_rows(second.text)[0])[0] == "CT0050"
+
+
+def test_ac24_filter_value_is_escaped(
+    use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
+) -> None:
+    """AC24: a script tag in a filter value never reaches the page unescaped."""
+    html = (
+        use_cohorts(load_cohorts(cohorts_csv))
+        .get("/", params={"inn": "<script>alert(1)</script>"})
+        .text
+    )
+
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
 
 
 def test_empty_table_renders_the_empty_notice(

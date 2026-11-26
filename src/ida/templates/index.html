@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Cohort table</h1>
+<form id="filters" method="get" action="/">
+<label for="inn">Active substance</label>
+<input type="text" id="inn" name="inn" value="{{ filters.inn }}">
+<label for="indication">Indication category</label>
+<input type="text" id="indication" name="indication" value="{{ filters.indication }}">
+<label for="route">Route</label>
+<input type="text" id="route" name="route" value="{{ filters.route }}">
+<button type="submit">Filter</button>
+</form>
 <p id="total">{{ page.total }} results</p>
 {% if not page.items %}<p id="empty">No results</p>{% endif %}
 <table id="cohorts">
@@ -29,4 +38,8 @@
 {% endfor %}
 </tbody>
 </table>
+<nav id="pagination">
+{% if previous_url %}<a rel="prev" href="{{ previous_url }}">Previous</a>{% endif %}
+{% if next_url %}<a rel="next" href="{{ next_url }}">Next</a>{% endif %}
+</nav>
 {% endblock %}

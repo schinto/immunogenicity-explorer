@@ -11,13 +11,21 @@ import logging
 import os
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from ida import __version__
-from ida.data import DataFormatError, MissingColumnError, load_cohorts, paginate
+from ida.data import (
+    PAGE_SIZE,
+    DataFormatError,
+    MissingColumnError,
+    filter_cohorts,
+    load_cohorts,
+    paginate,
+)
 from ida.models import Cohort
 
 logger = logging.getLogger(__name__)
@@ -115,14 +123,46 @@ def data_unavailable(request: Request, exc: DataUnavailableError) -> HTMLRespons
     )
 
 
+def _navigation_query(filters: dict[str, str], destination: int) -> str:
+    """Build a navigation link's query string from non-empty filters plus the page.
+
+    `urlencode` keeps values with spaces, `&` or `#` intact; blank filters are
+    left out, so only the page changes between the links.
+    """
+    params = {name: value for name, value in filters.items() if value}
+    params["page"] = destination
+    return "?" + urlencode(params)
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(
     request: Request,
     cohorts: Annotated[list[Cohort], Depends(get_cohorts)],
+    inn: str = "",
+    indication: str = "",
+    route: str = "",
+    page: int = Query(1, ge=1),
 ) -> HTMLResponse:
-    """Render the first page of the cohort table."""
-    page = paginate(cohorts, 1)
-    return templates.TemplateResponse(request, "index.html", {"page": page})
+    """Render one page of the filtered cohort table."""
+    filters = {
+        "inn": inn.strip(),
+        "indication": indication.strip(),
+        "route": route.strip(),
+    }
+    filtered = filter_cohorts(cohorts, inn=inn, indication=indication, route=route)
+    result = paginate(filtered, page)
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "page": result,
+            "filters": filters,
+            "previous_url": _navigation_query(filters, page - 1) if page > 1 else None,
+            "next_url": (
+                _navigation_query(filters, page + 1) if page * PAGE_SIZE < result.total else None
+            ),
+        },
+    )
 
 
 @app.get("/health")
