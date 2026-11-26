@@ -34,6 +34,18 @@ FOOTER_TEXTS = (
     "10.3389/fimmu.2026.1816949",
 )
 
+#: The columns `load_cohorts` requires, written exactly as in the dataset.
+DATA_HEADER = (
+    "IDC Row identifier",
+    "Trial ID",
+    "Molecule Assessed for ADA INN Name",
+    "Disease Indication Category",
+    "Therapeutic Route of Administration",
+    "Number of Patients analyzed for ADA",
+    "Number of ADA+ patients",
+    "Frequency of ADA+ patients",
+)
+
 client = TestClient(app)
 
 
@@ -49,11 +61,25 @@ def use_cohorts() -> Iterator[Callable[[list[Cohort]], TestClient]]:
     app.dependency_overrides.pop(get_cohorts, None)
 
 
+def without_comments(html: str) -> str:
+    """Return the page with HTML comments removed, so hidden markup never counts."""
+    return re.sub(r"<!--.*?-->", "", html, flags=re.S)
+
+
+def element_text(html: str, element_id: str, tag: str = "p") -> str:
+    """Return the stripped text of the visible element with the given id."""
+    match = re.search(rf'<{tag} id="{element_id}">(.*?)</{tag}>', without_comments(html), re.S)
+    assert match is not None, f"the page has no {tag} element with id {element_id!r}"
+    return match.group(1).strip()
+
+
 def table_body_rows(html: str) -> list[str]:
-    """Return the inner HTML of every `<tr>` of the cohort table body."""
-    body = re.search(r"<tbody>(.*?)</tbody>", html, re.S)
-    assert body is not None, "the page has no table body"
-    return re.findall(r"<tr>(.*?)</tr>", body.group(1), re.S)
+    """Return the inner HTML of every `<tr>` of the `table#cohorts` body."""
+    table = re.search(r'<table id="cohorts">(.*?)</table>', without_comments(html), re.S)
+    assert table is not None, "the page has no table with id 'cohorts'"
+    bodies = re.findall(r"<tbody>(.*?)</tbody>", table.group(1), re.S)
+    assert len(bodies) == 1, "the cohort table must have exactly one body"
+    return re.findall(r"<tr>(.*?)</tr>", bodies[0], re.S)
 
 
 def row_cells(row: str) -> list[str]:
@@ -62,10 +88,18 @@ def row_cells(row: str) -> list[str]:
 
 
 def text_of(html: str, element_id: str) -> str:
-    """Return the stripped text of the element with the given id."""
-    match = re.search(rf'<p id="{element_id}">(.*?)</p>', html, re.S)
-    assert match is not None, f"the page has no element with id {element_id!r}"
-    return match.group(1).strip()
+    """Return the stripped text of the `<p>` with the given id."""
+    return element_text(html, element_id)
+
+
+def footer_text(html: str) -> str:
+    """Return the inner text of the visible page footer."""
+    return element_text(html, "footer", "footer")
+
+
+def context_notice_text(html: str) -> str:
+    """Return the inner text of the context notice."""
+    return element_text(html, "context-notice")
 
 
 def synthetic_cohorts(make_cohort: Callable[..., Cohort], count: int) -> list[Cohort]:
@@ -118,10 +152,10 @@ def test_ac15_page_carries_footer_and_license(
     use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
 ) -> None:
     """AC15: source attribution, license and DOI are on the page."""
-    html = use_cohorts(load_cohorts(cohorts_csv)).get("/").text
+    footer = footer_text(use_cohorts(load_cohorts(cohorts_csv)).get("/").text)
 
     for text in FOOTER_TEXTS:
-        assert text in html
+        assert text in footer
 
 
 def test_ac15b_page_carries_context_notice(
@@ -130,7 +164,7 @@ def test_ac15b_page_carries_context_notice(
     """AC15b: the context notice is on the page exactly as specified."""
     html = use_cohorts(load_cohorts(cohorts_csv)).get("/").text
 
-    assert CONTEXT_NOTICE in html
+    assert context_notice_text(html) == CONTEXT_NOTICE
 
 
 def test_ac16_missing_values_render_as_dash(
@@ -178,9 +212,10 @@ def test_ac22_unavailable_data_answers_503_page_and_health_stays_up(
     assert response.status_code == 503
     assert response.headers["content-type"].startswith("text/html")
     assert "Data not available" in response.text
+    footer = footer_text(response.text)
     for text in FOOTER_TEXTS:
-        assert text in response.text
-    assert CONTEXT_NOTICE in response.text
+        assert text in footer
+    assert context_notice_text(response.text) == CONTEXT_NOTICE
 
     health = client.get("/health")
     assert health.status_code == 200
@@ -204,6 +239,49 @@ def test_ac22b_failed_load_is_not_cached(
     second = client.get("/")
     assert second.status_code == 200
     assert text_of(second.text, "total") == "30 results"
+
+
+def test_ac22b_successful_load_is_cached_until_reset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cohorts_csv: Path
+) -> None:
+    """AC22b: a successful load survives the file disappearing; reset empties it."""
+    data_dir = tmp_path / "idc"
+    data_dir.mkdir()
+    csv_path = data_dir / "clinical_trials.csv"
+    shutil.copyfile(cohorts_csv, csv_path)
+    monkeypatch.setenv("IDA_DATA_DIR", str(data_dir))
+    reset_cohorts_cache()
+
+    first = client.get("/")
+    assert first.status_code == 200
+    assert text_of(first.text, "total") == "30 results"
+
+    csv_path.unlink()
+    cached = client.get("/")
+    assert cached.status_code == 200
+    assert text_of(cached.text, "total") == "30 results"
+
+    reset_cohorts_cache()
+    after_reset = client.get("/")
+    assert after_reset.status_code == 503
+
+
+def test_health_never_invokes_the_loader(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`/health` is a liveness signal and never calls `get_cohorts`."""
+    calls: list[tuple[object, ...]] = []
+
+    def spy(*args: object, **kwargs: object) -> None:
+        calls.append(args)
+        raise AssertionError("/health must not load cohort data")
+
+    monkeypatch.setattr("ida.app.load_cohorts", spy)
+    reset_cohorts_cache()
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert calls == []
 
 
 def test_failed_load_logs_the_exception_type_without_its_message(
@@ -241,3 +319,41 @@ def test_missing_column_error_message_is_logged(
     messages = [record.getMessage() for record in caplog.records]
     assert any("MissingColumnError" in message for message in messages)
     assert any("Missing required column" in message for message in messages)
+
+
+def test_data_format_error_answers_503_and_logs_without_the_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """AC22: a malformed value is a 503; the log names row and column, not the cell."""
+    data_dir = tmp_path / "idc"
+    data_dir.mkdir()
+    with (data_dir / "clinical_trials.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(DATA_HEADER)
+        writer.writerow(
+            [
+                "CT9999_A1_001",
+                "CT9999",
+                "Testmab",
+                "Healthy volunteers",
+                "Subcutaneous",
+                "100",
+                "abc",
+                "5.0",
+            ]
+        )
+    monkeypatch.setenv("IDA_DATA_DIR", str(data_dir))
+    reset_cohorts_cache()
+
+    with caplog.at_level(logging.ERROR):
+        response = client.get("/")
+
+    assert response.status_code == 503
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Data not available" in response.text
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("DataFormatError" in message for message in messages)
+    assert any("Number of ADA+ patients" in message for message in messages)
+    assert any("CT9999_A1_001" in message for message in messages)
+    # The malformed cell itself must never reach the log.
+    assert all("abc" not in message for message in messages)
