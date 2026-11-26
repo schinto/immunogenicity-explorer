@@ -2,17 +2,20 @@
 
 | Field | Value |
 |---|---|
-| Status | **Draft** (revision 2, not yet frozen) |
+| Status | **Draft** (revision 3, not yet frozen) |
 | Risk | low |
 | Frozen on | – |
 
-> Revision 2 (2026-11-24) resolves the findings of the Goldfish design review: data access
-> contract, test seam, filter parameters and matching rules, malformed data, table and markup
-> contract, navigation, escaping and the slice plan. AC1 to AC4 are unchanged and already
-> implemented (PR #3). New criteria have new numbers; existing numbers keep their meaning.
+> Revision 2 (2026-11-24) resolved the first Goldfish design review: data access contract, test
+> seam, filter rules, malformed data, markup contract, navigation, escaping, slice plan.
+> Revision 3 (2026-11-26) resolves the second review round and a finding on the real data:
+> 7 measured rows have a non-whole `Number of ADA+ patients` (AC2 amended, AC4b rewritten),
+> cache behaviour after a failed load, the 503 page and AGENTS.md, rate formatting, the 422
+> mechanism, validation scope and the AC10 split. AC1, AC3 and AC4 are unchanged; numbers keep
+> their meaning, new criteria get new numbers.
 
 ## Goal
-A user can see all cohort data points of the IDC dataset in a table, page through them and
+A user can see all cohort data points with a measured ADA value of the IDC dataset in a table, page through them and
 filter them by active substance, indication category and route of administration. This makes
 visible that one active substance has many different ADA rates, depending on the clinical context.
 
@@ -24,6 +27,11 @@ visible that one active substance has many different ADA rates, depending on the
 - No design work beyond a readable, plain table. Filter fields are plain text inputs.
 
 ## Context
+
+### Abbreviations
+- **ADA**: anti-drug antibodies, antibodies a patient forms against a therapeutic.
+- **INN**: International Nonproprietary Name of an active substance (for example `Adalimumab`).
+- **IDC**: Immunogenicity Database Collaborative, the source of the dataset (see DATA.md).
 
 ### Data
 The basis is `data/idc/clinical_trials.csv` from the pinned IDC dataset
@@ -47,7 +55,13 @@ Properties of the data that matter for the implementation:
   `Number of Patients analyzed for ADA`.
 - The CSV file contains line breaks inside fields. It must not be read line by line,
   only via a CSV parser.
-- Counts are written as whole numbers, sometimes with a `.0` suffix (`25.0`).
+- Counts are mostly whole numbers, sometimes with a `.0` suffix (`25.0`). In the pinned
+  dataset **7 measured rows** have a non-whole `Number of ADA+ patients` (for example `62.7`,
+  `41.76`, rows `CT0670_A1_001` to `_003` and `CT0710_A1_002` to `_005`); the source reports
+  them this way and they are kept as decimal numbers. `Number of Patients analyzed for ADA` is
+  always whole.
+- No measured row lacks an ADA rate or an ADA+ count, and every rate lies between 0 and 100
+  (checked 2026-11-26). The rules for missing and malformed values still apply.
 - Missing values stay missing. They are never shown as 0.
 - `Frequency of ADA+ patients` is a percentage. Median 2.36, mean 11.66, maximum 100.
 - Routes include `Subcutaneous`, `Intravenous` and also `Subcutaneous or Intravenous`; this
@@ -79,11 +93,23 @@ A **cohort with a measured value** is a row with a value in
   has an empty `items` list and the real `total`. `paginate` raises `ValueError` for `page < 1`.
 - `ida.app.get_cohorts() -> list[Cohort]` is a FastAPI dependency. On its first call it reads
   the environment variable `IDA_DATA_DIR` (default `data/idc`), loads
-  `<IDA_DATA_DIR>/clinical_trials.csv` with `load_cohorts` and keeps the result in memory for
-  later calls. Nothing is read at import time.
-- If the file is missing or cannot be loaded (`OSError`, `MissingColumnError`,
-  `DataFormatError`), `/` and `/api/cohorts` answer status **503** with the text
-  `Data not available`. `/health` never calls `get_cohorts`.
+  `<IDA_DATA_DIR>/clinical_trials.csv` with `load_cohorts` and keeps a **successful** result in
+  a module-level cache for the lifetime of the process. Nothing is read at import time.
+- A failed load is **not** cached: the next request tries again, so providing the file later
+  needs no restart. Two concurrent first requests may both load the file; that is accepted.
+  `ida.app.reset_cohorts_cache()` empties the cache; tests call it so every test starts fresh.
+- **Any** exception while loading (missing file, unreadable file, `MissingColumnError`,
+  `DataFormatError`, parser errors) makes `/` and `/api/cohorts` answer status **503**: `/` as
+  an HTML page with the text `Data not available` plus footer and context notice,
+  `/api/cohorts` as JSON `{"detail": "Data not available"}`. The exception is logged with its
+  type; its message is logged only for `MissingColumnError` and `DataFormatError`, whose
+  messages contain nothing but a column name and a row identifier. Row data is never logged.
+  `/health` never calls `get_cohorts`.
+- Page validation: both endpoints declare `page: int = Query(1, ge=1)`, so FastAPI answers 422
+  for `page < 1` or a non-integer `page` before any handler code runs. The endpoints never pass
+  an invalid page to `paginate`; its `ValueError` is a guard for direct callers only.
+  When the page is invalid **and** the data is unavailable, either 422 or 503 is acceptable;
+  no test combines the two.
 - Tests never load data through `IDA_DATA_DIR`. Web and API tests replace the dependency with
   `app.dependency_overrides[get_cohorts]`, returning either the fixture cohorts
   (`load_cohorts(cohorts_csv)`) or synthetic `Cohort` objects built in the test.
@@ -112,43 +138,61 @@ A **cohort with a measured value** is a row with a value in
   `Active substance`, `Indication category`, `Route`, `Patients analyzed`, `ADA+ patients`,
   `ADA rate (%)`. The `<tbody>` holds exactly one `<tr>` per cohort of the current page, in
   file order.
-- Cell values: the text as loaded; counts as integers; the rate with one decimal (`4.0`);
-  every missing value as the dash `–` (U+2013), never `0`, `None` or `nan`.
+- Cell values: the text as loaded; whole counts as integers (`25`); a non-whole ADA+ count and
+  the rate with one decimal, formatted with Python's `format(value, ".1f")` (`62.7`, `41.76`
+  shows as `41.8`, `4.0`);
+  every missing value as the dash `–` (U+2013), never `0`, `None` or `nan`. The JSON interface
+  returns the numbers as loaded, without rounding, and `null` for every missing value.
 - When the current page has no rows, `<p id="empty">` contains `No results`.
 - `<nav id="pagination">` contains a link `Previous` when `page > 1` and a link `Next` when
   `page * 50 < total`. Both links keep the current filter parameters and change only `page`.
+  The query string is built with `urllib.parse.urlencode` from the non-empty filter values
+  (after trimming) plus `page`, so values containing `&`, `#` or spaces stay intact.
 - Footer on the page: the source attribution `Immunogenicity Database Collaborative`, the
   license notice `CC BY 4.0` and the DOI `10.3389/fimmu.2026.1816949`.
 - Context notice on the page, exactly: `ADA rates of different therapeutics are not comparable
   without their clinical context. This page serves research only and makes no medical or
   regulatory statement.`
-- JSON responses (`/api/cohorts`, `/health`) and error responses (422, 503) carry no footer
-  and no notice.
+- Every HTML page, including the 503 page of `/`, carries footer and context notice
+  (AGENTS.md: "on every page"). JSON responses (`/api/cohorts`, `/health`, 422 validation
+  errors, the 503 of `/api/cohorts`) are not pages and carry neither.
 
 ### Malformed data
-- A count (`Number of Patients analyzed for ADA`, `Number of ADA+ patients`) must be a whole
-  number; `25` and `25.0` are accepted, `2.5` or `abc` are not.
-- `Frequency of ADA+ patients` must be a number.
-- A violation raises `DataFormatError` (a `ValueError`) whose message names the row identifier
-  and the column. Nothing is truncated or guessed.
+Validation applies to **measured rows only**; rows without a value in
+`Number of Patients analyzed for ADA` are skipped before any validation.
+- `Number of Patients analyzed for ADA`: a whole number >= 0; `25` and `25.0` load as `25`.
+- `Number of ADA+ patients`: a number >= 0. A whole value loads as `int` (`25.0` -> `25`), a
+  non-whole value as `float` unchanged (`62.7` -> `62.7`).
+- `Frequency of ADA+ patients`: a finite number between 0 and 100 inclusive, loaded as `float`.
+- Anything else (for example `abc`, `2.5` patients analyzed, `-1`, `nan`, `inf`, `101`) raises
+  `DataFormatError` (a `ValueError`) whose message names the row identifier and the column.
+  Nothing is truncated, rounded or guessed.
 
 ## Acceptance criteria
 
-**Loading the data** (AC1 to AC4 implemented in slice 1, unchanged)
+**Loading the data** (AC1, AC3, AC4 implemented in slice 1; AC2 amended in revision 3)
 
 - **AC1** Given the fixture CSV. When the loading function is called. Then it returns
   exactly 30 cohorts, i.e. only rows with a value in `Number of Patients analyzed for ADA`.
 - **AC2** Given the fixture CSV. When a cohort is loaded. Then it has the fields
   `row_id`, `trial_id`, `inn_name`, `indication_category`, `route`, `n_analyzed`,
-  `n_ada_positive` and `ada_frequency_percent`. `n_analyzed` and `n_ada_positive` are
-  integers or missing, `ada_frequency_percent` is a decimal number or missing.
+  `n_ada_positive` and `ada_frequency_percent`. `n_analyzed` is an integer or missing;
+  `n_ada_positive` is an integer, a decimal number (only for a non-whole source value, see
+  "Malformed data") or missing; `ada_frequency_percent` is a decimal number or missing.
 - **AC3** Given a row whose `Number of ADA+ patients` is empty. When it is loaded.
   Then `n_ada_positive` is missing and **not** 0.
 - **AC4** Given a file with a missing required column. When the loading function is
   called. Then an error naming the missing column is raised.
-- **AC4b** Given a CSV whose measured row has `2.5` (or `abc`) in `Number of ADA+ patients`.
-  When it is loaded. Then `DataFormatError` is raised and its message contains the row
-  identifier and the column name. `25.0` still loads as 25.
+- **AC4b** Given a CSV with measured rows whose `Number of ADA+ patients` is `25.0` and `62.7`.
+  When it is loaded. Then the values are `25` (an `int`) and `62.7` (a `float`); nothing is
+  truncated or rounded.
+- **AC4c** Given a CSV with one measured row whose value is malformed, one file per case:
+  `2.5` in `Number of Patients analyzed for ADA`; `abc` or `-1` in `Number of ADA+ patients`;
+  `nan`, `inf` or `101` in `Frequency of ADA+ patients`. When it is loaded. Then
+  `DataFormatError` is raised and its message contains the row identifier and the column name.
+- **AC4d** Given a CSV with a row without a value in `Number of Patients analyzed for ADA` and
+  `abc` in `Number of ADA+ patients`. When it is loaded. Then no error is raised and the row is
+  not part of the result.
 
 **Filters and pages** (data layer)
 
@@ -172,8 +216,9 @@ A **cohort with a measured value** is a row with a value in
   status is 200, the content type is HTML, `#cohorts` has 30 body rows and `#total` reads
   `30 results`.
 - **AC10** Given 120 synthetic cohorts. When `GET /` is called without parameters. Then
-  `#cohorts` has exactly 50 body rows, `#total` reads `120 results`, and the pagination has a
-  `Next` link but no `Previous` link.
+  `#cohorts` has exactly 50 body rows and `#total` reads `120 results`.
+- **AC10b** Given 120 synthetic cohorts. When `GET /` is called without parameters. Then the
+  pagination has a `Next` link to page 2 but no `Previous` link.
 - **AC11** Given the 30 fixture cohorts. When `GET /?inn=adalimumab` is called. Then the table
   has the 4 Adalimumab rows, `#total` reads `4 results`, and the `inn` input shows
   `adalimumab`.
@@ -190,9 +235,16 @@ A **cohort with a measured value** is a row with a value in
 - **AC16** Given a synthetic cohort with missing `n_ada_positive` and missing
   `ada_frequency_percent`. When `GET /` renders it. Then both cells show `–`, and neither cell
   shows `0`, `None` or `nan`.
-- **AC22** Given `IDA_DATA_DIR` points to a directory without `clinical_trials.csv` and no
-  dependency override. When `GET /` or `GET /api/cohorts` is called. Then the status is 503
-  with the text `Data not available`, and `GET /health` still returns 200.
+- **AC16b** Given a synthetic cohort with `n_ada_positive` 62.7 and `ada_frequency_percent`
+  4.0, and another with `n_ada_positive` 25. When `GET /` renders them. Then the cells show
+  `62.7`, `4.0` and `25`.
+- **AC22** Given `IDA_DATA_DIR` points to a directory without `clinical_trials.csv`, no
+  dependency override and a fresh cache. When `GET /` is called. Then the status is 503, the
+  HTML contains `Data not available`, the footer and the context notice. `GET /api/cohorts`
+  answers 503 with JSON `{"detail": "Data not available"}`, and `GET /health` returns 200.
+- **AC22b** Given the situation of AC22. When the fixture data is then written to
+  `<IDA_DATA_DIR>/clinical_trials.csv` and `GET /` is called again without a restart. Then the
+  status is 200 and `#total` reads `30 results` (a failed load is not cached).
 - **AC23** Given 120 synthetic cohorts whose `inn_name` contains `adalimumab`. When
   `GET /?inn=adalimumab` and `GET /?inn=adalimumab&page=2` are called. Then the `Next` link of
   page 1 points to page 2 and keeps `inn=adalimumab`, and page 2 has a `Previous` link to
@@ -209,8 +261,9 @@ A **cohort with a measured value** is a row with a value in
 - **AC18** Given the 30 fixture cohorts. When `GET /api/cohorts?inn=adalimumab` is called. Then
   `total` is 4 and `items` holds the 4 Adalimumab cohorts. With 120 synthetic cohorts and no
   filter, `total` is 120 and `items` holds 50 entries.
-- **AC19** Given a synthetic cohort without an ADA rate. When it is delivered via the JSON
-  interface. Then its `ada_frequency_percent` is `null`.
+- **AC19** Given a synthetic cohort without an ADA rate and without an ADA+ count. When it is
+  delivered via the JSON interface. Then its `ada_frequency_percent` and `n_ada_positive` are
+  `null`.
 - **AC25** Given the running application. When `GET /api/cohorts?page=0` or `?page=abc` is
   called. Then the status is 422. `page_size` is always 50 and cannot be set by the client.
 
@@ -231,9 +284,9 @@ A **cohort with a measured value** is a row with a value in
 | `src/ida/app.py` | dependency `get_cohorts`, endpoints `/` and `/api/cohorts`, 503 handling | 3, 4, 5 |
 | `src/ida/templates/base.html` | page skeleton with footer and context notice | 3 |
 | `src/ida/templates/index.html` | filter form, total, table, empty notice, pagination | 3, 4 |
-| `tests/conftest.py` | autouse fixture setting `IDA_DATA_DIR` to a non-existent directory; helper to build synthetic cohorts | 3 |
+| `tests/conftest.py` | autouse fixture setting `IDA_DATA_DIR` to a non-existent directory and calling `reset_cohorts_cache()`; helper to build synthetic cohorts | 3 |
 | `tests/test_data.py` | tests for AC1 to AC8b | 1, 2 |
-| `tests/test_web.py` | tests for AC9 to AC16, AC22 to AC24 | 3, 4 |
+| `tests/test_web.py` | tests for AC9 to AC16b, AC22 to AC24 | 3, 4 |
 | `tests/test_api.py` | tests for AC17 to AC19, AC25 | 5 |
 
 Templates are found relative to `src/ida/` (the package directory), not the working
@@ -243,13 +296,15 @@ must already be in `pyproject.toml`; if one is missing, block the card and ask.
 ## Breakdown
 Slices run one after another; each starts after the previous one is merged.
 
-1. Done: `models.py` and `data.py` loading, AC1 to AC4.
-2. `data.py`: strict number parsing, filters and pages. AC4b, AC5 to AC8b.
-3. `app.py`, templates, conftest: `get_cohorts`, `GET /` with table, total, empty notice,
-   footer and context notice, 503 handling. AC9, AC10 (rows and total, links come in slice 4),
-   AC15, AC15b, AC16, AC22.
-4. `app.py`, `index.html`: filter form, page parameter and links, escaping. AC10 (links),
-   AC11 to AC14, AC23, AC24.
+1. Done: `models.py` and `data.py` loading, AC1 to AC4 (its number handling is replaced in
+   slice 2, see "Risks").
+2. `models.py`, `data.py`: number rules (AC2 as amended, AC4b to AC4d), filters and pages
+   (AC5 to AC8b).
+3. `app.py`, templates, conftest: `get_cohorts` with cache and reset, `GET /` (always page 1 in
+   this slice) with table, total, empty notice, footer and context notice, 503 handling.
+   AC9, AC10, AC15, AC15b, AC16, AC16b, AC22, AC22b.
+4. `app.py`, `index.html`: filter form, `page` parameter and links, escaping. AC10b, AC11 to
+   AC14, AC23, AC24.
 5. `app.py`: JSON interface. AC17 to AC19, AC25.
 
 AC20 and AC21 apply to every slice.
@@ -265,6 +320,12 @@ AC20 and AC21 apply to every slice.
   512 MB is sufficient.
 - Query strings may appear in the reverse proxy's access log. Accepted: the parameters are
   public search terms, not personal data.
+- Risk stays **low**: the site is public but read-only, serves only public CC BY 4.0 data, has
+  no accounts and no personal data; untrusted input is limited to three filter strings and the
+  page number (escaped, validated). Very long query strings are not limited by the app; the
+  reverse proxy's request size limit applies. Accepted residual risk.
+- Slice 1 code truncates non-whole counts (`int(float(...))`). Slice 2 replaces this with the
+  number rules above; until then the 7 affected rows load with wrong ADA+ counts.
 
 ## Acceptance
 The holdout scenarios live **outside this repo** on the host under
