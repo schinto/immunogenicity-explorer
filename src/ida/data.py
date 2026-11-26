@@ -6,6 +6,7 @@ CSV parser, never line by line. Column names are used exactly as in the dataset.
 
 from __future__ import annotations
 
+import decimal
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,59 +60,68 @@ def _text(value: object) -> str | None:
 class DataFormatError(ValueError):
     """Raised when a measured row holds a value that does not follow the number rules.
 
-    The message names the row identifier and the column, nothing else.
+    The message names the row identifier and the column, nothing else. It never
+    contains the offending cell, so it is safe to log (see the data access
+    contract in the spec).
     """
 
-    def __init__(self, row_id: str | None, column: str, value: str) -> None:
+    def __init__(self, row_id: str | None, column: str) -> None:
         self.row_id = row_id
         self.column = column
-        super().__init__(f"Invalid value {value!r} in column {column!r} for row {row_id!r}")
+        super().__init__(f"Invalid value in column {column!r} for row {row_id!r}")
 
 
-def _to_number(value: object, *, row_id: str | None, column: str) -> float | None:
-    """Parse a finite decimal number, raising `DataFormatError` for anything else."""
+def _to_decimal(value: object, *, row_id: str | None, column: str) -> decimal.Decimal | None:
+    """Parse a finite decimal from the source text without rounding, or raise.
+
+    Validation happens on the exact source decimal; only validated values are
+    converted to `int` or `float` afterwards.
+    """
     text = _text(value)
     if text is None:
         return None
     try:
-        number = float(text)
-    except ValueError as error:
-        raise DataFormatError(row_id, column, text) from error
-    if not math.isfinite(number):
-        raise DataFormatError(row_id, column, text)
+        number = decimal.Decimal(text)
+    except (decimal.InvalidOperation, ValueError) as error:
+        raise DataFormatError(row_id, column) from error
+    if not number.is_finite():
+        raise DataFormatError(row_id, column)
     return number
 
 
 def _to_whole(value: object, *, row_id: str | None, column: str) -> int | None:
-    """Parse a whole number >= 0; `25` and `25.0` both load as `25`."""
-    number = _to_number(value, row_id=row_id, column=column)
+    """Parse a whole number >= 0; `25` and `25.0` both load as the exact `int` 25."""
+    number = _to_decimal(value, row_id=row_id, column=column)
     if number is None:
         return None
-    if number < 0 or not number.is_integer():
-        raise DataFormatError(row_id, column, str(_text(value)))
+    if number < 0 or number != number.to_integral_value():
+        raise DataFormatError(row_id, column)
     return int(number)
 
 
 def _to_count(value: object, *, row_id: str | None, column: str) -> int | float | None:
-    """Parse a count >= 0; a whole value loads as `int`, a non-whole one as `float`."""
-    number = _to_number(value, row_id=row_id, column=column)
+    """Parse a count >= 0; a whole value loads as exact `int`, a non-whole one as `float`."""
+    number = _to_decimal(value, row_id=row_id, column=column)
     if number is None:
         return None
     if number < 0:
-        raise DataFormatError(row_id, column, str(_text(value)))
-    if number.is_integer():
+        raise DataFormatError(row_id, column)
+    if number == number.to_integral_value():
         return int(number)
-    return number
+    result = float(number)
+    if not math.isfinite(result):
+        raise DataFormatError(row_id, column)
+    return result
 
 
 def _to_frequency(value: object, *, row_id: str | None, column: str) -> float | None:
     """Parse an ADA rate in percent: a finite number between 0 and 100 inclusive."""
-    number = _to_number(value, row_id=row_id, column=column)
+    number = _to_decimal(value, row_id=row_id, column=column)
     if number is None:
         return None
-    if not 0.0 <= number <= 100.0:
-        raise DataFormatError(row_id, column, str(_text(value)))
-    return number
+    if not decimal.Decimal(0) <= number <= decimal.Decimal(100):
+        raise DataFormatError(row_id, column)
+    return float(number)
 
 
 def load_cohorts(path: str | Path) -> list[Cohort]:

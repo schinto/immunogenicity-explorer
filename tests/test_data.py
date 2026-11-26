@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import re
 from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 
@@ -176,6 +177,10 @@ def test_ac2_amended_ada_positive_is_int_or_missing_in_the_fixture(
     cohorts_csv: Path,
 ) -> None:
     """AC2 as amended: `n_ada_positive` is an int, a non-whole decimal, or missing."""
+    # The annotation itself is the amended AC2 contract: reverting it to
+    # `int | None` must fail here even though the fixture only holds whole counts.
+    assert get_type_hints(Cohort)["n_ada_positive"] == int | float | None
+
     for cohort in load_cohorts(cohorts_csv):
         assert cohort.n_ada_positive is None or isinstance(cohort.n_ada_positive, int | float)
         # The fixture has no non-whole ADA+ count, so every value is an int.
@@ -304,6 +309,189 @@ def test_ac4d_unmeasured_row_is_skipped_before_validation(tmp_path: Path) -> Non
     cohorts = load_cohorts(path)
 
     assert [cohort.row_id for cohort in cohorts] == ["CT0002_A1_001"]
+
+
+# --- Data access contract: logging-safe messages and exact decimals --------
+
+SYNTHETIC_CELL_MARKER = "SYNTHETIC_CELL_MARKER"
+
+
+@pytest.mark.parametrize(
+    ("n_analyzed", "n_ada_positive", "frequency", "column"),
+    [
+        (SYNTHETIC_CELL_MARKER, "1.0", "4.0", "Number of Patients analyzed for ADA"),
+        ("10.0", SYNTHETIC_CELL_MARKER, "4.0", "Number of ADA+ patients"),
+        ("10.0", "1.0", SYNTHETIC_CELL_MARKER, "Frequency of ADA+ patients"),
+    ],
+    ids=["analyzed", "ada-positive", "frequency"],
+)
+def test_data_format_error_message_never_contains_the_raw_cell(
+    tmp_path: Path,
+    n_analyzed: str,
+    n_ada_positive: str,
+    frequency: str,
+    column: str,
+) -> None:
+    """Data access contract: the message names row and column, never the cell.
+
+    The message may be logged, so it must not leak row data.
+    """
+    row_id = "TEST_ROW"
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                row_id,
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                n_analyzed,
+                n_ada_positive,
+                frequency,
+            ]
+        ],
+    )
+
+    with pytest.raises(DataFormatError) as excinfo:
+        load_cohorts(path)
+
+    message = str(excinfo.value)
+    assert SYNTHETIC_CELL_MARKER not in message
+    assert row_id in message
+    assert column in message
+
+
+def test_analyzed_count_is_validated_on_the_exact_source_decimal(tmp_path: Path) -> None:
+    """A value just above a whole number is malformed, not rounded down to it."""
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                "2.0000000000000001",
+                "1",
+                "4.0",
+            ]
+        ],
+    )
+
+    with pytest.raises(DataFormatError) as excinfo:
+        load_cohorts(path)
+
+    message = str(excinfo.value)
+    assert "CT0001_A1_001" in message
+    assert "Number of Patients analyzed for ADA" in message
+
+
+def test_large_whole_analyzed_count_keeps_its_exact_value(tmp_path: Path) -> None:
+    """A whole count beyond float precision loads as the exact `int`, not rounded."""
+    exact = 9007199254740993  # 2**53 + 1, not representable as a float
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                str(exact),
+                "1",
+                "4.0",
+            ]
+        ],
+    )
+
+    cohort = load_cohorts(path)[0]
+
+    assert cohort.n_analyzed == exact
+    assert isinstance(cohort.n_analyzed, int)
+
+
+def test_large_whole_ada_positive_count_keeps_its_exact_value(tmp_path: Path) -> None:
+    """A whole ADA+ count beyond float precision loads as the exact `int`."""
+    exact = 9007199254740993  # 2**53 + 1, not representable as a float
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                str(exact),
+                str(exact),
+                "4.0",
+            ]
+        ],
+    )
+
+    cohort = load_cohorts(path)[0]
+
+    assert cohort.n_ada_positive == exact
+    assert isinstance(cohort.n_ada_positive, int)
+
+
+def test_frequency_just_above_100_is_rejected(tmp_path: Path) -> None:
+    """A rate above 100 is malformed even if it would round to 100.0 as a float."""
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                "10",
+                "1",
+                "100.0000000000000001",
+            ]
+        ],
+    )
+
+    with pytest.raises(DataFormatError) as excinfo:
+        load_cohorts(path)
+
+    message = str(excinfo.value)
+    assert "CT0001_A1_001" in message
+    assert "Frequency of ADA+ patients" in message
+
+
+def test_frequency_of_exactly_100_is_accepted(tmp_path: Path) -> None:
+    """The upper bound is inclusive; a rate of exactly 100 loads as a `float`."""
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                "10",
+                "1",
+                "100",
+            ]
+        ],
+    )
+
+    cohort = load_cohorts(path)[0]
+
+    assert cohort.ada_frequency_percent == pytest.approx(100.0)
+    assert isinstance(cohort.ada_frequency_percent, float)
 
 
 # --- AC5 to AC8: filters ---------------------------------------------------
