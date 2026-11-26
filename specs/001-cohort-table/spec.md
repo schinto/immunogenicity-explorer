@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | **Draft** (revision 3, not yet frozen) |
+| Status | **Frozen** |
 | Risk | low |
-| Frozen on | – |
+| Frozen on | 2026-11-26 |
 
 > Revision 2 (2026-11-24) resolved the first Goldfish design review: data access contract, test
 > seam, filter rules, malformed data, markup contract, navigation, escaping, slice plan.
