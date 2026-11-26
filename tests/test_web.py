@@ -459,6 +459,35 @@ def test_ac22b_successful_load_is_cached_until_reset(
     assert after_reset.status_code == 503
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/docs", "/docs/", "/redoc", "/redoc/", "/docs/oauth2-redirect"],
+)
+def test_interactive_api_documentation_is_disabled(path: str) -> None:
+    """`/docs`, `/redoc` and the Swagger OAuth redirect are gone, not redirected.
+
+    Those pages are HTML without footer and context notice, so they must not be
+    reachable (spec 001, page contract and AGENTS.md "on every page"). A 404 with
+    no `Location` header proves the route is absent rather than moved.
+    """
+    no_redirect_client = TestClient(app, follow_redirects=False)
+
+    response = no_redirect_client.get(path)
+
+    assert response.status_code == 404, f"{path} must not be served"
+    assert "location" not in response.headers, f"{path} must not redirect elsewhere"
+
+
+def test_openapi_schema_is_still_served() -> None:
+    """`/openapi.json` stays available and still documents `/api/cohorts`."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    schema = response.json()
+    assert "/api/cohorts" in schema["paths"]
+
+
 def test_health_never_invokes_the_loader(monkeypatch: pytest.MonkeyPatch) -> None:
     """`/health` is a liveness signal and never calls `get_cohorts`."""
     calls: list[tuple[object, ...]] = []

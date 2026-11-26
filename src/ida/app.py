@@ -45,7 +45,16 @@ API_PATH = "/api/cohorts"
 #: The dash for a missing value (U+2013), never `0`, `None` or `nan`.
 DASH = "\u2013"
 
-app = FastAPI(title="Immunogenicity Explorer", version=__version__)
+#: No interactive API documentation: `/docs` and `/redoc` would be HTML pages
+#: without the footer and context notice that every page must carry, so both
+#: routes and the Swagger OAuth redirect are disabled. `/openapi.json` remains.
+app = FastAPI(
+    title="Immunogenicity Explorer",
+    version=__version__,
+    docs_url=None,
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url=None,
+)
 
 #: Successful load result, kept for the lifetime of the process.
 _cohorts_cache: list[Cohort] | None = None
