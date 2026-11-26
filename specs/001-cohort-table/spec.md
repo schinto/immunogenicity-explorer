@@ -102,10 +102,14 @@ A **cohort with a measured value** is a row with a value in
   `DataFormatError`, parser errors) makes `/` and `/api/cohorts` answer status **503**: `/` as
   an HTML page with the text `Data not available` plus footer and context notice,
   `/api/cohorts` as JSON `{"detail": "Data not available"}`. The exception is logged with its
-  type and message only, never with row data. `/health` never calls `get_cohorts`.
+  type; its message is logged only for `MissingColumnError` and `DataFormatError`, whose
+  messages contain nothing but a column name and a row identifier. Row data is never logged.
+  `/health` never calls `get_cohorts`.
 - Page validation: both endpoints declare `page: int = Query(1, ge=1)`, so FastAPI answers 422
   for `page < 1` or a non-integer `page` before any handler code runs. The endpoints never pass
   an invalid page to `paginate`; its `ValueError` is a guard for direct callers only.
+  When the page is invalid **and** the data is unavailable, either 422 or 503 is acceptable;
+  no test combines the two.
 - Tests never load data through `IDA_DATA_DIR`. Web and API tests replace the dependency with
   `app.dependency_overrides[get_cohorts]`, returning either the fixture cohorts
   (`load_cohorts(cohorts_csv)`) or synthetic `Cohort` objects built in the test.
@@ -135,12 +139,15 @@ A **cohort with a measured value** is a row with a value in
   `ADA rate (%)`. The `<tbody>` holds exactly one `<tr>` per cohort of the current page, in
   file order.
 - Cell values: the text as loaded; whole counts as integers (`25`); a non-whole ADA+ count and
-  the rate with one decimal, formatted with Python's `format(value, ".1f")` (`62.7`, `4.0`);
+  the rate with one decimal, formatted with Python's `format(value, ".1f")` (`62.7`, `41.76`
+  shows as `41.8`, `4.0`);
   every missing value as the dash `–` (U+2013), never `0`, `None` or `nan`. The JSON interface
-  returns the numbers as loaded, without rounding.
+  returns the numbers as loaded, without rounding, and `null` for every missing value.
 - When the current page has no rows, `<p id="empty">` contains `No results`.
 - `<nav id="pagination">` contains a link `Previous` when `page > 1` and a link `Next` when
   `page * 50 < total`. Both links keep the current filter parameters and change only `page`.
+  The query string is built with `urllib.parse.urlencode` from the non-empty filter values
+  (after trimming) plus `page`, so values containing `&`, `#` or spaces stay intact.
 - Footer on the page: the source attribution `Immunogenicity Database Collaborative`, the
   license notice `CC BY 4.0` and the DOI `10.3389/fimmu.2026.1816949`.
 - Context notice on the page, exactly: `ADA rates of different therapeutics are not comparable
@@ -254,8 +261,9 @@ Validation applies to **measured rows only**; rows without a value in
 - **AC18** Given the 30 fixture cohorts. When `GET /api/cohorts?inn=adalimumab` is called. Then
   `total` is 4 and `items` holds the 4 Adalimumab cohorts. With 120 synthetic cohorts and no
   filter, `total` is 120 and `items` holds 50 entries.
-- **AC19** Given a synthetic cohort without an ADA rate. When it is delivered via the JSON
-  interface. Then its `ada_frequency_percent` is `null`.
+- **AC19** Given a synthetic cohort without an ADA rate and without an ADA+ count. When it is
+  delivered via the JSON interface. Then its `ada_frequency_percent` and `n_ada_positive` are
+  `null`.
 - **AC25** Given the running application. When `GET /api/cohorts?page=0` or `?page=abc` is
   called. Then the status is 422. `page_size` is always 50 and cannot be set by the client.
 
@@ -288,7 +296,8 @@ must already be in `pyproject.toml`; if one is missing, block the card and ask.
 ## Breakdown
 Slices run one after another; each starts after the previous one is merged.
 
-1. Done: `models.py` and `data.py` loading, AC1 to AC4.
+1. Done: `models.py` and `data.py` loading, AC1 to AC4 (its number handling is replaced in
+   slice 2, see "Risks").
 2. `models.py`, `data.py`: number rules (AC2 as amended, AC4b to AC4d), filters and pages
    (AC5 to AC8b).
 3. `app.py`, templates, conftest: `get_cohorts` with cache and reset, `GET /` (always page 1 in
