@@ -1,20 +1,22 @@
 """FastAPI application.
 
-`GET /` renders the cohort table, `/health` is the liveness signal. The cohort
-data is loaded lazily on the first request and only a successful result is kept
-in the module-level cache (see the data access contract of spec 001).
+`GET /` renders the cohort table, `GET /api/cohorts` serves the same filtered
+cohorts as JSON, `/health` is the liveness signal. The cohort data is loaded
+lazily on the first request and only a successful result is kept in the
+module-level cache (see the data access contract of spec 001).
 """
 
 from __future__ import annotations
 
 import logging
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ida import __version__
@@ -36,6 +38,9 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 DEFAULT_DATA_DIR = "data/idc"
 DATA_FILE_NAME = "clinical_trials.csv"
+
+#: Path of the JSON interface; its 503 body is JSON, not an HTML page.
+API_PATH = "/api/cohorts"
 
 #: The dash for a missing value (U+2013), never `0`, `None` or `nan`.
 DASH = "\u2013"
@@ -113,8 +118,15 @@ templates.env.filters["rate"] = _format_rate
 
 
 @app.exception_handler(DataUnavailableError)
-def data_unavailable(request: Request, exc: DataUnavailableError) -> HTMLResponse:
-    """Answer 503 with an HTML page that carries footer and context notice."""
+def data_unavailable(request: Request, exc: DataUnavailableError) -> Response:
+    """Answer 503 for unavailable data.
+
+    The JSON interface gets the object `{"detail": "Data not available"}`;
+    `/` gets an HTML page that carries footer and context notice. A JSON
+    response is not a page and carries neither.
+    """
+    if request.url.path == API_PATH:
+        return JSONResponse({"detail": "Data not available"}, status_code=503)
     return templates.TemplateResponse(
         request,
         "base.html",
@@ -163,6 +175,31 @@ def index(
             ),
         },
     )
+
+
+@app.get(API_PATH)
+def cohorts_json(
+    cohorts: Annotated[list[Cohort], Depends(get_cohorts)],
+    inn: str = "",
+    indication: str = "",
+    route: str = "",
+    page: int = Query(1, ge=1),
+) -> dict[str, object]:
+    """Serve one page of the filtered cohorts as JSON.
+
+    Same filter rules and pages as `/`, but the numbers are served as loaded,
+    without the HTML rounding, and every missing value is `null`. `page_size`
+    is always the fixed `PAGE_SIZE`: it is not a parameter of this endpoint, so
+    a client-supplied value cannot change it.
+    """
+    filtered = filter_cohorts(cohorts, inn=inn, indication=indication, route=route)
+    result = paginate(filtered, page)
+    return {
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "items": [asdict(cohort) for cohort in result.items],
+    }
 
 
 @app.get("/health")
