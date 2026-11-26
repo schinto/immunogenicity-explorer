@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import decimal
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, TypeVar
@@ -15,6 +16,10 @@ from typing import Generic, TypeVar
 import pandas as pd
 
 from ida.models import Cohort
+
+#: Plain decimal number syntax accepted from the source CSV. Underscores, spaces
+#: and other syntax that `Decimal` would interpret loosely are rejected.
+_NUMBER_SYNTAX = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
 
 #: Number of items on one page of the table and the JSON interface.
 PAGE_SIZE = 50
@@ -75,11 +80,16 @@ def _to_decimal(value: object, *, row_id: str | None, column: str) -> decimal.De
     """Parse a finite decimal from the source text without rounding, or raise.
 
     Validation happens on the exact source decimal; only validated values are
-    converted to `int` or `float` afterwards.
+    converted to `int` or `float` afterwards. The source text must match a strict
+    plain-number syntax: `Decimal` accepts underscores as digit separators (it
+    follows Python's numeric literal rules), which would silently turn `1__0`
+    into `10`; those cells are rejected instead.
     """
     text = _text(value)
     if text is None:
         return None
+    if not _NUMBER_SYNTAX.fullmatch(text):
+        raise DataFormatError(row_id, column)
     try:
         number = decimal.Decimal(text)
     except (decimal.InvalidOperation, ValueError) as error:
@@ -109,7 +119,7 @@ def _to_count(value: object, *, row_id: str | None, column: str) -> int | float 
     if number == number.to_integral_value():
         return int(number)
     result = float(number)
-    if not math.isfinite(result):
+    if not math.isfinite(result) or (number > 0 and result == 0.0):
         raise DataFormatError(row_id, column)
     return result
 
@@ -121,7 +131,10 @@ def _to_frequency(value: object, *, row_id: str | None, column: str) -> float | 
         return None
     if not decimal.Decimal(0) <= number <= decimal.Decimal(100):
         raise DataFormatError(row_id, column)
-    return float(number)
+    result = float(number)
+    if number > 0 and result == 0.0:
+        raise DataFormatError(row_id, column)
+    return result
 
 
 def load_cohorts(path: str | Path) -> list[Cohort]:

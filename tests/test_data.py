@@ -494,6 +494,120 @@ def test_frequency_of_exactly_100_is_accepted(tmp_path: Path) -> None:
     assert isinstance(cohort.ada_frequency_percent, float)
 
 
+@pytest.mark.parametrize(
+    ("n_analyzed", "n_ada_positive", "frequency", "column"),
+    [
+        ("1__0", "1", "4.0", "Number of Patients analyzed for ADA"),
+        ("10", "1_0", "4.0", "Number of ADA+ patients"),
+        ("10", "1", "0._5", "Frequency of ADA+ patients"),
+    ],
+    ids=["analyzed-double-underscore", "ada-positive-underscore", "frequency-underscore"],
+)
+def test_underscore_numeric_syntax_is_rejected(
+    tmp_path: Path,
+    n_analyzed: str,
+    n_ada_positive: str,
+    frequency: str,
+    column: str,
+) -> None:
+    """Strict parsing: `Decimal` strips underscores, so they must be rejected explicitly.
+
+    `1__0` must not silently become `10` and `0._5` must not silently become `0.5`.
+    """
+    row_id = "CT0001_A1_001"
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                row_id,
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                n_analyzed,
+                n_ada_positive,
+                frequency,
+            ]
+        ],
+    )
+
+    with pytest.raises(DataFormatError) as excinfo:
+        load_cohorts(path)
+
+    message = str(excinfo.value)
+    assert row_id in message
+    assert column in message
+
+
+@pytest.mark.parametrize(
+    ("n_analyzed", "n_ada_positive", "frequency", "column"),
+    [
+        ("10", "1e-400", "4.0", "Number of ADA+ patients"),
+        ("10", "1", "1e-400", "Frequency of ADA+ patients"),
+    ],
+    ids=["ada-positive-underflow", "frequency-underflow"],
+)
+def test_positive_value_that_underflows_to_zero_is_rejected(
+    tmp_path: Path,
+    n_analyzed: str,
+    n_ada_positive: str,
+    frequency: str,
+    column: str,
+) -> None:
+    """A positive measurement must never be reported as zero through float underflow."""
+    row_id = "CT0001_A1_001"
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                row_id,
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                n_analyzed,
+                n_ada_positive,
+                frequency,
+            ]
+        ],
+    )
+
+    with pytest.raises(DataFormatError) as excinfo:
+        load_cohorts(path)
+
+    message = str(excinfo.value)
+    assert row_id in message
+    assert column in message
+
+
+def test_valid_zero_values_are_accepted_in_both_float_columns(tmp_path: Path) -> None:
+    """A real zero is not an underflow and loads as zero in each affected column."""
+    path = write_csv(
+        tmp_path / "clinical_trials.csv",
+        REQUIRED_COLUMNS,
+        [
+            [
+                "CT0001_A1_001",
+                "CT0001",
+                "adalimumab",
+                "Blood Disorders",
+                "Subcutaneous",
+                "10",
+                "0",
+                "0",
+            ]
+        ],
+    )
+
+    cohort = load_cohorts(path)[0]
+
+    assert cohort.n_ada_positive == 0
+    assert isinstance(cohort.n_ada_positive, int)
+    assert cohort.ada_frequency_percent == pytest.approx(0.0)
+
+
 # --- AC5 to AC8: filters ---------------------------------------------------
 
 
