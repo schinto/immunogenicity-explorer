@@ -269,6 +269,53 @@ def test_pagination_links_round_trip_filter_values_and_drop_blank_ones(
     assert pagination_links(response.text)["Next"] == "?inn=Mab+%26+Co+%231&page=2"
 
 
+def test_indication_and_route_filters_are_applied_and_kept_in_pagination(
+    use_cohorts: Callable[[list[Cohort]], TestClient], make_cohort: Callable[..., Cohort]
+) -> None:
+    """Whitespace-padded `indication` and `route` filter independently and survive paging."""
+    matching = synthetic_cohorts(
+        make_cohort, 120, indication_category="Cancer and neoplasms", route="Subcutaneous"
+    )
+    decoys = [
+        # Right route, wrong indication: fails if `indication` is ignored.
+        make_cohort(
+            row_id="DECOY1_A1_001",
+            trial_id="DECOY1",
+            indication_category="Healthy volunteers",
+            route="Subcutaneous",
+        ),
+        # Right indication, wrong route: fails if `route` is ignored.
+        make_cohort(
+            row_id="DECOY2_A1_001",
+            trial_id="DECOY2",
+            indication_category="Cancer and neoplasms",
+            route="Intravenous",
+        ),
+    ]
+    cohorts = [*matching, *decoys]
+    params = {"indication": " Cancer and neoplasms ", "route": " Subcutaneous "}
+
+    first = use_cohorts(cohorts).get("/", params=params)
+    rows = table_body_rows(first.text)
+    assert len(rows) == 50
+    assert text_of(first.text, "total") == "120 results"
+    assert row_cells(rows[0])[0] == "CT0000"
+    assert form_inputs(first.text) == {
+        "inn": "",
+        "indication": "Cancer and neoplasms",
+        "route": "Subcutaneous",
+    }
+    first_links = pagination_links(first.text)
+    assert "Previous" not in first_links
+    assert first_links["Next"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=2"
+
+    second = use_cohorts(cohorts).get("/", params={**params, "page": "2"})
+    second_links = pagination_links(second.text)
+    assert second_links["Previous"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=1"
+    assert second_links["Next"] == "?indication=Cancer+and+neoplasms&route=Subcutaneous&page=3"
+    assert row_cells(table_body_rows(second.text)[0])[0] == "CT0050"
+
+
 def test_ac24_filter_value_is_escaped(
     use_cohorts: Callable[[list[Cohort]], TestClient], cohorts_csv: Path
 ) -> None:
